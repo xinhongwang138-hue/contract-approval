@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { AppError, ERROR_CODES } from "@/shared/errors";
 import { prisma } from "@/server/db/client";
 import { auth } from "./auth";
@@ -55,6 +56,14 @@ export async function requireAuth(): Promise<AuthContext> {
   const context = await getAuth();
   if (!context) {
     throw new AppError(ERROR_CODES.UNAUTHENTICATED, "请先登录");
+  }
+  return context;
+}
+
+export async function requirePageAuth(): Promise<AuthContext> {
+  const context = await getAuth();
+  if (!context) {
+    redirect("/login");
   }
   return context;
 }

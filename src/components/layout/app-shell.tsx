@@ -32,11 +32,13 @@ import {
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/server/actions/auth";
 import type { SessionUser } from "@/server/auth/session";
+import type { PermissionKey } from "@/shared/permissions";
 
 type NavItem = {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  permissions?: PermissionKey[];
 };
 
 type NavGroup = {
@@ -49,32 +51,47 @@ const NAV_GROUPS: NavGroup[] = [
     label: "工作",
     items: [
       { href: "/", label: "工作台", icon: LayoutDashboard },
-      { href: "/contracts", label: "合同管理", icon: FileText },
-      { href: "/seals", label: "用印管理", icon: Stamp },
-      { href: "/archive", label: "合同归档", icon: Archive },
+      { href: "/contracts", label: "合同管理", icon: FileText, permissions: ["contract.read"] },
+      { href: "/seals", label: "用印管理", icon: Stamp, permissions: ["contract.seal"] },
+      { href: "/archive", label: "合同归档", icon: Archive, permissions: ["contract.archive"] },
       { href: "/notifications", label: "消息通知", icon: Bell },
     ],
   },
   {
     label: "分析",
     items: [
-      { href: "/reports/efficiency", label: "效率报表", icon: BarChart3 },
-      { href: "/audit", label: "审计日志", icon: ScrollText },
+      { href: "/reports/efficiency", label: "效率报表", icon: BarChart3, permissions: ["report.read"] },
+      { href: "/audit", label: "审计日志", icon: ScrollText, permissions: ["audit.read"] },
     ],
   },
   {
     label: "管理",
     items: [
-      { href: "/admin/flows", label: "审批流程", icon: Workflow },
-      { href: "/admin/templates", label: "合同模板", icon: FileStack },
-      { href: "/admin/parties", label: "相对方", icon: Building2 },
-      { href: "/admin/departments", label: "部门", icon: Network },
-      { href: "/admin/users", label: "用户", icon: Users },
-      { href: "/admin/roles", label: "角色权限", icon: ShieldCheck },
-      { href: "/admin/delegates", label: "审批委托", icon: UserCog },
+      {
+        href: "/admin/flows",
+        label: "审批流程",
+        icon: Workflow,
+        permissions: ["flow.create", "flow.publish", "flow.manage"],
+      },
+      { href: "/admin/templates", label: "合同模板", icon: FileStack, permissions: ["contract.create"] },
+      { href: "/admin/parties", label: "相对方", icon: Building2, permissions: ["contract.create"] },
+      { href: "/admin/departments", label: "部门", icon: Network, permissions: ["system.user.manage"] },
+      { href: "/admin/users", label: "用户", icon: Users, permissions: ["system.user.manage"] },
+      { href: "/admin/roles", label: "角色权限", icon: ShieldCheck, permissions: ["system.role.manage"] },
+      { href: "/admin/delegates", label: "审批委托", icon: UserCog, permissions: ["contract.approve"] },
     ],
   },
 ];
+
+function visibleGroups(permissions: readonly PermissionKey[]): NavGroup[] {
+  const granted = new Set(permissions);
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => !item.permissions || item.permissions.some((key) => granted.has(key)),
+    ),
+  })).filter((group) => group.items.length > 0);
+}
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {
@@ -83,10 +100,16 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLinks({ pathname }: { pathname: string }) {
+function NavLinks({
+  pathname,
+  groups,
+}: {
+  pathname: string;
+  groups: NavGroup[];
+}) {
   return (
     <nav className="space-y-6 px-3 py-4">
-      {NAV_GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.label} className="space-y-1">
           <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground">
             {group.label}
@@ -129,19 +152,22 @@ function BrandHeader() {
 
 export function AppShell({
   user,
+  permissions,
   children,
 }: {
   user: SessionUser;
+  permissions: PermissionKey[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const groups = visibleGroups(permissions);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
       <aside className="hidden border-r bg-sidebar lg:block">
         <BrandHeader />
-        <NavLinks pathname={pathname} />
+        <NavLinks pathname={pathname} groups={groups} />
       </aside>
 
       <div className="flex min-h-screen flex-col">
@@ -158,7 +184,7 @@ export function AppShell({
                 <SheetTitle>合同审批系统</SheetTitle>
               </SheetHeader>
               <div onClick={() => setMobileOpen(false)}>
-                <NavLinks pathname={pathname} />
+                <NavLinks pathname={pathname} groups={groups} />
               </div>
             </SheetContent>
           </Sheet>

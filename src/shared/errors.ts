@@ -44,6 +44,13 @@ export class IllegalTransitionError extends AppError {
   }
 }
 
+export type ActionFailure = {
+  ok: false;
+  code: ErrorCode;
+  message: string;
+  fields?: Record<string, string>;
+};
+
 export type ActionResult<T> =
   | { ok: true; data: T }
-  | { ok: false; code: ErrorCode; message: string };
+  | ActionFailure;

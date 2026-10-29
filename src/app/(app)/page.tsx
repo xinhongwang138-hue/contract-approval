@@ -15,13 +15,13 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/shared/datetime";
-import { requireAuth } from "@/server/auth/session";
+import { requirePageAuth } from "@/server/auth/session";
 import { prisma } from "@/server/db/client";
 
 export const metadata = { title: "工作台" };
 
 export default async function WorkbenchPage() {
-  const { user } = await requireAuth();
+  const { user } = await requirePageAuth();
   const now = new Date();
 
   const [pendingCount, myContractCount, ccCount, overdueCount, pendingTasks] =
