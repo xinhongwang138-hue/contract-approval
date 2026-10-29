@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { isEditableContractStatus } from "@/shared/contract-status";
 import { formatDate } from "@/shared/datetime";
 import { formatMoney } from "@/shared/money";
 import type { ContractSortField } from "@/shared/schemas/contract";
@@ -142,7 +143,7 @@ export function ContractTable({
                         查看
                       </Link>
                     </Button>
-                    {canEdit && item.status === "draft" ? (
+                    {canEdit && isEditableContractStatus(item.status) ? (
                       <Button asChild variant="ghost" size="sm">
                         <Link href={`/contracts/${item.id}/edit`}>
                           <Pencil className="size-4" />

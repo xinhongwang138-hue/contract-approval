@@ -15,6 +15,7 @@ import {
   getContractDetail,
   listContractFormOptions,
 } from "@/server/services/contract";
+import { contractStatusLabel, isEditableContractStatus } from "@/shared/contract-status";
 import { AppError, ERROR_CODES } from "@/shared/errors";
 
 export const metadata = { title: "编辑合同" };
@@ -50,13 +51,13 @@ export default async function EditContractPage({
     throw error;
   }
 
-  if (detail.status !== "draft") {
+  if (!isEditableContractStatus(detail.status)) {
     return (
       <div className="space-y-4">
         <Alert>
           <AlertTitle>该合同当前不可编辑</AlertTitle>
           <AlertDescription>
-            只有草稿状态的合同可以修改，当前状态为「{detail.status}」。
+            只有草稿或被驳回的合同可以修改，当前状态为「{contractStatusLabel(detail.status)}」。
           </AlertDescription>
         </Alert>
         <Button asChild variant="outline">

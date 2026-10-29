@@ -3,7 +3,7 @@ import type { AccessContext } from "@/server/auth/access";
 import { requireContractAccess } from "@/server/auth/access";
 import { recordAudit } from "@/server/audit";
 import { prisma } from "@/server/db/client";
-import { requireDraftContract } from "@/server/services/contract";
+import { requireEditableContract } from "@/server/services/contract";
 import { saveStoredFile } from "@/server/storage/local-storage";
 import { AppError, ERROR_CODES, ValidationError } from "@/shared/errors";
 import {
@@ -108,7 +108,7 @@ export async function uploadAttachment(
     file: File;
   },
 ): Promise<{ id: string; name: string }> {
-  await requireDraftContract(access, input.contractId);
+  await requireEditableContract(access, input.contractId);
 
   const name = sanitizeFileName(input.file.name);
   const extension = getFileExtension(name);
@@ -213,7 +213,7 @@ export async function deleteAttachment(
     throw new AppError(ERROR_CODES.NOT_FOUND, "附件不存在");
   }
 
-  await requireDraftContract(access, attachment.contractId);
+  await requireEditableContract(access, attachment.contractId);
 
   await prisma.$transaction(async (tx) => {
     await tx.attachment.update({

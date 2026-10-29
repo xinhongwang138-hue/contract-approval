@@ -17,7 +17,7 @@ import { AppError, ERROR_CODES } from "@/shared/errors";
 import { formatMoney } from "@/shared/money";
 import { ATTACHMENT_KIND_LABELS } from "@/shared/schemas/attachment";
 import type { AttachmentKind } from "@/shared/schemas/attachment";
-import { CONTRACT_STAGE_LABELS } from "@/shared/contract-status";
+import { CONTRACT_STAGE_LABELS, isEditableContractStatus } from "@/shared/contract-status";
 
 export const metadata = { title: "合同详情" };
 
@@ -60,7 +60,8 @@ export default async function ContractDetailPage({
 
   const similar = await findSimilarContracts(access, detail.id);
   const canEdit =
-    access.permissions.has("contract.update") && detail.status === "draft";
+    access.permissions.has("contract.update") &&
+    isEditableContractStatus(detail.status);
 
   return (
     <div className="space-y-6">
@@ -74,7 +75,9 @@ export default async function ContractDetailPage({
             </Button>
             {canEdit ? (
               <Button asChild>
-                <Link href={`/contracts/${detail.id}/edit`}>编辑草稿</Link>
+                <Link href={`/contracts/${detail.id}/edit`}>
+                  {detail.status === "draft" ? "编辑草稿" : "修改后重提"}
+                </Link>
               </Button>
             ) : null}
           </>

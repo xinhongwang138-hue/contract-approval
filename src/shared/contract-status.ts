@@ -21,6 +21,17 @@ export const CONTRACT_STAGE_LABELS: Record<string, string> = {
   returned: "退回修改",
 };
 
+// 规格 4.4 第 6 条要求驳回后发起人可改后再提；状态表里 rejected 是终态前的可改窗口，
+// 因此草稿与被驳回的合同都开放编辑，不额外引入 rejected -> draft 迁移。
+export const EDITABLE_CONTRACT_STATUSES: readonly ContractStatus[] = [
+  "draft",
+  "rejected",
+];
+
+export function isEditableContractStatus(status: ContractStatus): boolean {
+  return EDITABLE_CONTRACT_STATUSES.includes(status);
+}
+
 export function contractStatusLabel(status: ContractStatus): string {
   return CONTRACT_STATUS_LABELS[status] ?? status;
 }

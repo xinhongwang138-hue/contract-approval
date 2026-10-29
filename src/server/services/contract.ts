@@ -9,6 +9,7 @@ import {
   type ContractField,
   type ContractFormData,
 } from "@/shared/contract-fields";
+import { isEditableContractStatus } from "@/shared/contract-status";
 import { Decimal, toDecimal } from "@/shared/money";
 import type {
   ContractDraftInput,
@@ -537,7 +538,7 @@ export async function createContract(
   });
 }
 
-export async function requireDraftContract(
+export async function requireEditableContract(
   access: AccessContext,
   contractId: string,
 ): Promise<{
@@ -549,8 +550,8 @@ export async function requireDraftContract(
 }> {
   requireContractPermission(access, "contract.update");
   const contract = await getScopedContract(access, contractId);
-  if (contract.status !== "draft") {
-    throw new AppError(ERROR_CODES.CONFLICT, "仅草稿状态的合同可以编辑");
+  if (!isEditableContractStatus(contract.status)) {
+    throw new AppError(ERROR_CODES.CONFLICT, "仅草稿或被驳回的合同可以编辑");
   }
   return contract;
 }
@@ -559,7 +560,7 @@ export async function updateContract(
   access: AccessContext,
   input: ContractUpdateInput,
 ): Promise<{ id: string; no: string }> {
-  const current = await requireDraftContract(access, input.id);
+  const current = await requireEditableContract(access, input.id);
   if (input.templateId !== current.templateId) {
     throw new ValidationError("合同模板创建后不可更换", {
       templateId: "合同模板创建后不可更换",

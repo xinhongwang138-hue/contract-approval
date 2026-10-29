@@ -5,7 +5,7 @@ import { prisma } from "@/server/db/client";
 import { getAccessContext } from "@/server/auth/access";
 import {
   createContract,
-  requireDraftContract,
+  requireEditableContract,
 } from "@/server/services/contract";
 import {
   deleteAttachment,
@@ -232,7 +232,7 @@ describe("attachment security", () => {
         }),
       ).rejects.toMatchObject({ code: "CONFLICT" });
 
-      await expect(requireDraftContract(access, contractId)).rejects.toMatchObject(
+      await expect(requireEditableContract(access, contractId)).rejects.toMatchObject(
         { code: "CONFLICT" },
       );
       await expect(deleteAttachment(access, created.id)).rejects.toMatchObject({
@@ -242,6 +242,34 @@ describe("attachment security", () => {
       await prisma.contract.update({
         where: { id: contractId },
         data: { status: "draft" },
+      });
+    }
+  });
+
+  it("keeps a rejected contract editable so the initiator can resubmit", async () => {
+    const access = await getAccessContext(employeeId);
+    await prisma.contract.update({
+      where: { id: contractId },
+      data: { status: "rejected", stage: "returned" },
+    });
+
+    try {
+      await expect(requireEditableContract(access, contractId)).resolves.toMatchObject({
+        status: "rejected",
+      });
+      const uploaded = await uploadAttachment(access, {
+        contractId,
+        kind: "appendix",
+        file: pdfFile("驳回后补充.pdf", "%PDF-1.7\nafter-reject"),
+      });
+      expect(uploaded.name).toBe("驳回后补充.pdf");
+      await expect(deleteAttachment(access, uploaded.id)).resolves.toMatchObject({
+        id: uploaded.id,
+      });
+    } finally {
+      await prisma.contract.update({
+        where: { id: contractId },
+        data: { status: "draft", stage: "normal" },
       });
     }
   });
