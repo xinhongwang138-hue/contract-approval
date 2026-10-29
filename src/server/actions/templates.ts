@@ -54,8 +54,9 @@ export async function saveTemplateAction(
     return toFailure(error);
   }
 
+  const submittingFields = formData.has("fields");
   const fields = readFields(formData);
-  if (fields === undefined) {
+  if (submittingFields && fields === undefined) {
     return {
       ok: false,
       code: ERROR_CODES.VALIDATION_FAILED,
@@ -69,7 +70,7 @@ export async function saveTemplateAction(
     name: formData.get("name"),
     category: formData.get("category"),
     active: formData.get("active") === "true",
-    fields,
+    ...(submittingFields ? { fields } : {}),
   };
 
   try {

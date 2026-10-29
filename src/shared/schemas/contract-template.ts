@@ -33,7 +33,7 @@ export const contractTemplateCreateSchema = z.object({
   name: nameSchema,
   category: categorySchema,
   active: z.boolean().default(true),
-  fields: fieldsSchema,
+  fields: fieldsSchema.default([]),
 });
 
 export const contractTemplateUpdateSchema = z.object({
@@ -41,7 +41,8 @@ export const contractTemplateUpdateSchema = z.object({
   name: nameSchema,
   category: categorySchema,
   active: z.boolean().default(true),
-  fields: fieldsSchema,
+  // 元信息对话框不提交字段；缺省即保持 fieldSchema 不变。
+  fields: fieldsSchema.optional(),
 });
 
 export const contractTemplateToggleSchema = z.object({

@@ -19,6 +19,8 @@ export type TemplateListItem = {
   active: boolean;
   fieldCount: number;
   contractCount: number;
+  flowId: string | null;
+  flowName: string | null;
   updatedAt: Date;
 };
 
@@ -44,6 +46,8 @@ export async function listContractTemplates(): Promise<TemplateListItem[]> {
       active: true,
       fieldSchema: true,
       updatedAt: true,
+      flowId: true,
+      flow: { select: { name: true } },
       _count: { select: { contracts: { where: { deletedAt: null } } } },
     },
   });
@@ -56,6 +60,8 @@ export async function listContractTemplates(): Promise<TemplateListItem[]> {
     active: row.active,
     fieldCount: parseFieldSchema(row.fieldSchema).length,
     contractCount: row._count.contracts,
+    flowId: row.flowId,
+    flowName: row.flow?.name ?? null,
     updatedAt: row.updatedAt,
   }));
 }
@@ -181,7 +187,9 @@ export async function updateContractTemplate(
         name: input.name,
         category: input.category,
         active: input.active,
-        fieldSchema: toFieldSchemaJson(input.fields),
+        ...(input.fields === undefined
+          ? {}
+          : { fieldSchema: toFieldSchemaJson(input.fields) }),
         updatedBy: actorId,
       },
       select: { id: true, name: true, category: true, active: true },
