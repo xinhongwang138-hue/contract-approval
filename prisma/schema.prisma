@@ -1,0 +1,803 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum PartyType {
+  customer
+  supplier
+  other
+}
+
+enum ContractStatus {
+  draft
+  pending
+  approving
+  approved
+  to_seal
+  sealed
+  active
+  rejected
+  withdrawn
+  amended
+  expired
+  terminated
+  archived
+}
+
+enum ContractStage {
+  normal
+  returned
+}
+
+enum AttachmentKind {
+  body
+  appendix
+  seal_proof
+  other
+}
+
+enum MilestoneKind {
+  sealed
+  effective
+  paid
+  expired
+  archived
+  terminated
+  expiry_warning
+}
+
+enum SealType {
+  company
+  contract
+  finance
+  legal
+}
+
+enum ParticipantKind {
+  initiator
+  approver
+  cc
+  seal
+  watcher
+}
+
+enum FlowStatus {
+  running
+  approved
+  rejected
+  withdrawn
+  terminated
+  cancelled
+}
+
+enum FlowVersionStatus {
+  active
+  archived
+}
+
+enum NodeType {
+  start
+  approval
+  cc
+  condition
+  join
+  action
+  end
+}
+
+enum NodeRunStatus {
+  pending
+  running
+  waiting_join
+  approved
+  rejected
+  skipped
+  cancelled
+}
+
+enum TaskStatus {
+  pending
+  approved
+  rejected
+  transferred
+  cancelled
+  expired
+}
+
+enum TaskAction {
+  approve
+  reject
+  return
+  transfer
+  add_sign
+  withdraw
+  timeout_remind
+  auto_approve
+  auto_reject
+  system
+}
+
+enum AddSignType {
+  before
+  after
+  parallel
+}
+
+enum DataScopeType {
+  self
+  dept
+  dept_and_sub
+  all
+}
+
+model Department {
+  id            String    @id @default(cuid())
+  name          String
+  parentId      String?
+  managerUserId String?
+  path          String    @unique
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  deletedAt     DateTime?
+
+  parent         Department?  @relation("DepartmentTree", fields: [parentId], references: [id])
+  children       Department[] @relation("DepartmentTree")
+  manager        User?        @relation("DepartmentManager", fields: [managerUserId], references: [id])
+  users          User[]       @relation("UserDepartment")
+  dataScopes     DataScope[]
+  ownedContracts Contract[]   @relation("ContractOwnerDepartment")
+
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  emailVerified Boolean    @default(false)
+  image         String?
+  departmentId  String?
+  managerUserId String?
+  status        UserStatus @default(active)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  deletedAt     DateTime?
+
+  department         Department?           @relation("UserDepartment", fields: [departmentId], references: [id])
+  manager            User?                 @relation("UserManager", fields: [managerUserId], references: [id])
+  reports            User[]                @relation("UserManager")
+  managedDepartments Department[]          @relation("DepartmentManager")
+  sessions           Session[]
+  accounts           Account[]
+  userRoles          UserRole[]
+  delegatedFrom      Delegate[]            @relation("DelegateFrom")
+  delegatedTo        Delegate[]            @relation("DelegateTo")
+  contractsCreated   Contract[]            @relation("ContractCreator")
+  instancesStarted   FlowInstance[]        @relation("FlowInstanceStarter")
+  tasksAssigned      FlowTask[]            @relation("TaskAssignee")
+  notifications      Notification[]
+  participants       ContractParticipant[]
+
+  @@index([departmentId])
+  @@index([managerUserId])
+  @@index([deletedAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  password              String?
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model Role {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  name      String
+  isSystem  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  deletedAt DateTime?
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+  dataScope       DataScope?
+
+  @@index([deletedAt])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@index([deletedAt])
+}
+
+model Permission {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  name      String
+  group     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  deletedAt DateTime?
+
+  rolePermissions RolePermission[]
+
+  @@index([group])
+  @@index([deletedAt])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  deletedAt    DateTime?
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@index([deletedAt])
+}
+
+model DataScope {
+  roleId       String        @id
+  scope        DataScopeType
+  departmentId String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  deletedAt    DateTime?
+
+  role       Role        @relation(fields: [roleId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@index([departmentId])
+  @@index([deletedAt])
+}
+
+model Delegate {
+  id             String    @id @default(cuid())
+  fromUserId     String
+  toUserId       String
+  permissionKeys String[]
+  startAt        DateTime
+  endAt          DateTime
+  reason         String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  deletedAt      DateTime?
+
+  fromUser User @relation("DelegateFrom", fields: [fromUserId], references: [id])
+  toUser   User @relation("DelegateTo", fields: [toUserId], references: [id])
+
+  @@index([fromUserId, startAt, endAt])
+  @@index([toUserId, startAt])
+  @@index([deletedAt])
+}
+
+model Party {
+  id        String    @id @default(cuid())
+  name      String
+  uscc      String?   @unique
+  type      PartyType
+  address   String?
+  contacts  Json      @default("[]")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  deletedAt DateTime?
+
+  contractsAsPartyA Contract[] @relation("ContractPartyA")
+  contractsAsPartyB Contract[] @relation("ContractPartyB")
+
+  @@index([name])
+  @@index([deletedAt])
+}
+
+model ContractType {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  name      String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+  deletedAt DateTime?
+
+  contracts Contract[]
+
+  @@index([deletedAt])
+}
+
+model ContractTemplate {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  name            String
+  category        String
+  fieldSchema     Json
+  flowId          String?
+  docxTemplateUrl String?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  deletedAt       DateTime?
+
+  flow      ApprovalFlow? @relation(fields: [flowId], references: [id])
+  contracts Contract[]
+
+  @@index([flowId])
+  @@index([category])
+  @@index([deletedAt])
+}
+
+model Contract {
+  id                    String         @id @default(cuid())
+  no                    String         @unique
+  title                 String
+  templateId            String
+  typeId                String
+  partyAId              String
+  partyBId              String
+  amount                Decimal        @db.Decimal(18, 2)
+  currency              String         @default("CNY")
+  signDate              DateTime
+  startDate             DateTime
+  endDate               DateTime
+  status                ContractStatus @default(draft)
+  stage                 ContractStage  @default(normal)
+  formData              Json
+  currentFlowInstanceId String?        @unique
+  sourceContractId      String?
+  ownerDepartmentId     String?
+  createdBy             String
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  updatedBy             String?
+  deletedAt             DateTime?
+
+  template            ContractTemplate      @relation(fields: [templateId], references: [id])
+  type                ContractType          @relation(fields: [typeId], references: [id])
+  partyA              Party                 @relation("ContractPartyA", fields: [partyAId], references: [id])
+  partyB              Party                 @relation("ContractPartyB", fields: [partyBId], references: [id])
+  creator             User                  @relation("ContractCreator", fields: [createdBy], references: [id])
+  sourceContract      Contract?             @relation("ContractAmendment", fields: [sourceContractId], references: [id])
+  derivedContracts    Contract[]            @relation("ContractAmendment")
+  currentFlowInstance FlowInstance?         @relation("CurrentFlowInstance", fields: [currentFlowInstanceId], references: [id])
+  flowInstances       FlowInstance[]        @relation("ContractFlowInstances")
+  ownerDepartment     Department?           @relation("ContractOwnerDepartment", fields: [ownerDepartmentId], references: [id])
+  versions            ContractVersion[]
+  attachments         Attachment[]
+  milestones          ContractMilestone[]
+  sealRecords         SealRecord[]
+  participants        ContractParticipant[]
+
+  @@index([partyAId, partyBId, amount, signDate])
+  @@index([status, createdBy])
+  @@index([templateId])
+  @@index([sourceContractId])
+  @@index([ownerDepartmentId, status])
+  @@index([deletedAt])
+}
+
+model ContractNoSequence {
+  templateCode String
+  ym           String
+  seq          Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@id([templateCode, ym])
+}
+
+model ContractVersion {
+  id             String    @id @default(cuid())
+  contractId     String
+  version        Int
+  bodyMarkdown   String
+  bodyStorageKey String?
+  changeSummary  String?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  updatedBy      String?
+  deletedAt      DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, version])
+  @@index([contractId])
+  @@index([deletedAt])
+}
+
+model Attachment {
+  id         String         @id @default(cuid())
+  contractId String
+  versionId  String?
+  kind       AttachmentKind
+  storageKey String
+  sha256     String
+  name       String
+  mime       String
+  size       Int
+  uploadedBy String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId, kind])
+  @@index([sha256])
+  @@index([deletedAt])
+}
+
+model ContractMilestone {
+  id         String        @id @default(cuid())
+  contractId String
+  kind       MilestoneKind
+  at         DateTime
+  note       String?
+  operatorId String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  createdBy  String?
+  updatedBy  String?
+  deletedAt  DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId, at])
+  @@index([kind])
+  @@index([deletedAt])
+}
+
+model SealRecord {
+  id          String    @id @default(cuid())
+  contractId  String
+  sealType    SealType
+  copies      Int
+  applicantId String
+  appliedAt   DateTime
+  pickedAt    DateTime?
+  returnedAt  DateTime?
+  notaryNo    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  deletedAt   DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@index([returnedAt])
+  @@index([deletedAt])
+}
+
+model ContractParticipant {
+  id         String          @id @default(cuid())
+  contractId String
+  userId     String
+  kind       ParticipantKind
+  createdAt  DateTime        @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([contractId, userId, kind])
+  @@index([userId, contractId])
+  @@index([contractId])
+}
+
+model ApprovalFlow {
+  id              String    @id @default(cuid())
+  name            String
+  code            String    @unique
+  category        String
+  draftDefinition Json
+  latestVersion   Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  deletedAt       DateTime?
+
+  versions  ApprovalFlowVersion[]
+  instances FlowInstance[]
+  templates ContractTemplate[]
+
+  @@index([category])
+  @@index([deletedAt])
+}
+
+model ApprovalFlowVersion {
+  id          String            @id @default(cuid())
+  flowId      String
+  version     Int
+  definition  Json
+  publishedAt DateTime          @default(now())
+  publishedBy String
+  status      FlowVersionStatus @default(active)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  deletedAt   DateTime?
+
+  flow      ApprovalFlow   @relation(fields: [flowId], references: [id])
+  instances FlowInstance[]
+
+  @@unique([flowId, version])
+  @@index([flowId, status])
+  @@index([deletedAt])
+}
+
+model FlowInstance {
+  id                 String     @id @default(cuid())
+  contractId         String
+  flowId             String
+  flowVersionId      String
+  definitionSnapshot Json
+  status             FlowStatus @default(running)
+  context            Json       @default("{}")
+  startedBy          String
+  startedAt          DateTime   @default(now())
+  finishedAt         DateTime?
+  version            Int        @default(0)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  createdBy          String?
+  updatedBy          String?
+  deletedAt          DateTime?
+
+  contract           Contract            @relation("ContractFlowInstances", fields: [contractId], references: [id])
+  flow               ApprovalFlow        @relation(fields: [flowId], references: [id])
+  flowVersion        ApprovalFlowVersion @relation(fields: [flowVersionId], references: [id])
+  starter            User                @relation("FlowInstanceStarter", fields: [startedBy], references: [id])
+  currentForContract Contract?           @relation("CurrentFlowInstance")
+  nodeRuns           FlowNodeRun[]
+  tasks              FlowTask[]
+  events             FlowEventLog[]
+
+  @@index([contractId])
+  @@index([status, startedAt])
+  @@index([deletedAt])
+}
+
+model FlowNodeRun {
+  id            String        @id @default(cuid())
+  instanceId    String
+  nodeId        String
+  nodeType      NodeType
+  nodeName      String
+  status        NodeRunStatus @default(pending)
+  startedAt     DateTime      @default(now())
+  finishedAt    DateTime?
+  result        Json          @default("{}")
+  version       Int           @default(0)
+  attempt       Int           @default(1)
+  forkPath      Json          @default("[]")
+  awaitingCount Int?
+  joinedCount   Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  deletedAt     DateTime?
+
+  instance FlowInstance @relation(fields: [instanceId], references: [id])
+  tasks    FlowTask[]
+
+  @@unique([instanceId, nodeId, attempt])
+  @@index([instanceId, status])
+  @@index([deletedAt])
+}
+
+model FlowTask {
+  id                 String       @id @default(cuid())
+  instanceId         String
+  nodeRunId          String
+  assigneeId         String
+  status             TaskStatus   @default(pending)
+  action             TaskAction?
+  opinion            String?
+  decidedAt          DateTime?
+  decidedBy          String?
+  dueAt              DateTime?
+  originTaskId       String?
+  addSignType        AddSignType?
+  sequenceIndex      Int?
+  activatedAt        DateTime?
+  blockedByNodeRunId String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  createdBy          String?
+  updatedBy          String?
+  deletedAt          DateTime?
+
+  instance FlowInstance @relation(fields: [instanceId], references: [id])
+  nodeRun  FlowNodeRun  @relation(fields: [nodeRunId], references: [id])
+  assignee User         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  @@unique([nodeRunId, assigneeId])
+  @@index([assigneeId, status])
+  @@index([dueAt, status])
+  @@index([instanceId])
+  @@index([deletedAt])
+}
+
+model FlowEventLog {
+  id         String   @id @default(cuid())
+  instanceId String
+  nodeRunId  String?
+  taskId     String?
+  actorId    String
+  action     String
+  from       String?
+  to         String?
+  detail     Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  instance FlowInstance @relation(fields: [instanceId], references: [id])
+
+  @@index([instanceId, createdAt])
+  @@index([taskId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  ip        String?
+  ua        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt, createdAt])
+}
+
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String
+  scope     String
+  response  Json
+  createdAt DateTime @default(now())
+
+  @@unique([key, scope])
+  @@index([createdAt])
+}
+
+model IntegrationToken {
+  id         String    @id @default(cuid())
+  name       String
+  tokenHash  String    @unique
+  prefix     String
+  scopes     String[]
+  active     Boolean   @default(true)
+  createdBy  String
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  updatedBy  String?
+  deletedAt  DateTime?
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}
