@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ContractStatusBadge } from "@/components/contract/status-badge";
 import { AttachmentUploader } from "@/components/contract/attachment-uploader";
 import { AttachmentDeleteButton } from "@/components/contract/attachment-delete-button";
+import { SubmitContractPanel } from "./submit-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getAccessContext } from "@/server/auth/access";
 import { requirePageAuth } from "@/server/auth/session";
@@ -12,6 +14,7 @@ import {
   findSimilarContracts,
   getContractDetail,
 } from "@/server/services/contract";
+import { previewContractFlow, type FlowPreview } from "@/server/services/approval";
 import { formatDate, formatDateTime } from "@/shared/datetime";
 import { AppError, ERROR_CODES } from "@/shared/errors";
 import { formatMoney } from "@/shared/money";
@@ -59,6 +62,21 @@ export default async function ContractDetailPage({
   }
 
   const similar = await findSimilarContracts(access, detail.id);
+
+  let preview: FlowPreview | null = null;
+  let previewError: string | null = null;
+  const canSubmit =
+    access.permissions.has("contract.submit") &&
+    (detail.status === "draft" || detail.status === "rejected");
+  if (canSubmit) {
+    try {
+      preview = (await previewContractFlow(access, detail.id)).preview;
+    } catch (error) {
+      previewError =
+        error instanceof AppError ? error.message : "无法解析审批流，请联系管理员";
+    }
+  }
+
   const canEdit =
     access.permissions.has("contract.update") &&
     isEditableContractStatus(detail.status);
@@ -74,11 +92,21 @@ export default async function ContractDetailPage({
               <Link href="/contracts">返回列表</Link>
             </Button>
             {canEdit ? (
-              <Button asChild>
+              <Button asChild variant="outline">
                 <Link href={`/contracts/${detail.id}/edit`}>
                   {detail.status === "draft" ? "编辑草稿" : "修改后重提"}
                 </Link>
               </Button>
+            ) : null}
+            <Button asChild variant="ghost">
+              <Link href={`/contracts/${detail.id}/timeline`}>审批轨迹</Link>
+            </Button>
+            {canSubmit ? (
+              <SubmitContractPanel
+                contractId={detail.id}
+                preview={preview}
+                error={previewError}
+              />
             ) : null}
           </>
         }
@@ -256,8 +284,28 @@ export default async function ContractDetailPage({
 
           <section className="rounded-lg border bg-card p-4 shadow-xs">
             <h2 className="mb-3 text-sm font-semibold">审批与用印</h2>
-            <p className="text-sm text-muted-foreground">
-              审批引擎将在提交后生成审批轨迹；用印登记在审批通过后开放。
+            {preview ? (
+              <ol className="space-y-2 text-sm">
+                {preview.nodes.map((node, index) => (
+                  <li key={node.nodeId} className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{index + 1}</span>
+                    <span className="font-medium">{node.name}</span>
+                    <Badge variant="outline">{node.summary}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {node.assigneeNames.length > 0
+                        ? node.assigneeNames.join("、")
+                        : "解析不到人员"}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {previewError ?? "提交后按模板关联的审批流生成待办与轨迹。"}
+              </p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              用印登记在审批通过后开放。
             </p>
           </section>
         </div>

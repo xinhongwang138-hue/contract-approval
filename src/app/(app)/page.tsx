@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CheckSquare,
-  FileText,
   Inbox,
   Send,
 } from "lucide-react";
@@ -14,105 +13,90 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatDateTime } from "@/shared/datetime";
+import { formatDate, formatDateTime } from "@/shared/datetime";
+import { formatMoney } from "@/shared/money";
+import { contractStatusLabel } from "@/shared/contract-status";
+import { getAccessContext } from "@/server/auth/access";
 import { requirePageAuth } from "@/server/auth/session";
-import { prisma } from "@/server/db/client";
+import { getWorkbench } from "@/server/services/approval";
+import { countUnreadNotifications } from "@/server/services/notification";
 
 export const metadata = { title: "工作台" };
 
 export default async function WorkbenchPage() {
   const { user } = await requirePageAuth();
+  const access = await getAccessContext(user.id);
   const now = new Date();
 
-  const [pendingCount, myContractCount, ccCount, overdueCount, pendingTasks] =
-    await Promise.all([
-      prisma.flowTask.count({
-        where: { assigneeId: user.id, status: "pending", deletedAt: null },
-      }),
-      prisma.contract.count({
-        where: { createdBy: user.id, deletedAt: null },
-      }),
-      prisma.contractParticipant.count({
-        where: {
-          userId: user.id,
-          kind: "cc",
-          contract: { deletedAt: null },
-        },
-      }),
-      prisma.flowTask.count({
-        where: {
-          assigneeId: user.id,
-          status: "pending",
-          dueAt: { lt: now },
-          deletedAt: null,
-        },
-      }),
-      prisma.flowTask.findMany({
-        where: { assigneeId: user.id, status: "pending", deletedAt: null },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        select: {
-          id: true,
-          instanceId: true,
-          dueAt: true,
-          createdAt: true,
-          nodeRun: { select: { nodeName: true } },
-          instance: {
-            select: {
-              contract: { select: { id: true, no: true, title: true } },
-            },
-          },
-        },
-      }),
-    ]);
+  const [workbench, unread] = await Promise.all([
+    getWorkbench(access, now),
+    countUnreadNotifications(user.id),
+  ]);
 
   const cards = [
     {
+      key: "pending",
       label: "待我审批",
-      value: pendingCount,
-      description: "归属你的待审批任务",
+      value: workbench.counts.pending,
+      description: "含受托代办的合同",
       icon: CheckSquare,
       href: "#pending-tasks",
     },
     {
+      key: "initiated",
       label: "我发起的",
-      value: myContractCount,
-      description: "由你创建的合同",
+      value: workbench.counts.initiated,
+      description: "在途审批的合同",
       icon: Send,
-      href: "/contracts?mine=1",
+      href: "#initiated",
     },
     {
+      key: "cc",
       label: "抄送我的",
-      value: ccCount,
-      description: "抄送给你的合同",
+      value: workbench.counts.cc,
+      description: "抄送给我备案的合同",
       icon: Inbox,
-      href: "/contracts?cc=1",
+      href: "#cc",
     },
     {
+      key: "overdue",
       label: "已超期",
-      value: overdueCount,
+      value: workbench.counts.overdue,
       description: "超过处理时限的待办",
       icon: AlertTriangle,
-      href: "#pending-tasks",
+      href: "#overdue",
     },
   ];
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          你好，{user.name}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          今天是 {formatDateTime(now)}（Asia/Shanghai）
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            你好，{user.name}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            今天是 {formatDateTime(now)}（Asia/Shanghai）
+          </p>
+        </div>
+        <Link
+          href="/notifications"
+          className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+        >
+          消息通知
+          {unread > 0 ? (
+            <Badge variant="destructive" className="ml-2">
+              {unread}
+            </Badge>
+          ) : null}
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <Link key={card.label} href={card.href} className="group">
+            <Link key={card.key} href={card.href} className="group">
               <Card className="transition-colors group-hover:border-foreground/20">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -135,52 +119,157 @@ export default async function WorkbenchPage() {
       </div>
 
       <Card id="pending-tasks">
-        <CardHeader>
-          <CardTitle>最近待办</CardTitle>
-          <CardDescription>按到达时间倒序展示最近 5 条</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>待办明细</CardTitle>
+            <CardDescription>按到期时间优先，逾期置顶</CardDescription>
+          </div>
+          <Link href="/contracts" className="text-sm text-primary hover:underline">
+            合同台账
+          </Link>
         </CardHeader>
         <CardContent>
-          {pendingTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <FileText className="size-8 text-muted-foreground" />
-              <p className="text-sm font-medium">暂无待办</p>
-              <p className="text-xs text-muted-foreground">
-                有合同提交到你审批时，会出现在这里
-              </p>
-            </div>
+          {workbench.pending.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              暂无待办，有合同提交到你审批时会出现在这里。
+            </p>
           ) : (
             <ul className="divide-y">
-              {pendingTasks.map((task) => {
-                const overdue = task.dueAt !== null && task.dueAt < now;
-                return (
-                  <li key={task.id}>
-                    <Link
-                      href={`/approvals/${task.instanceId}`}
-                      className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 hover:bg-muted/50"
-                    >
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {task.instance.contract.no}
-                      </span>
-                      <span className="flex-1 text-sm font-medium">
-                        {task.instance.contract.title}
-                      </span>
+              {workbench.pending.map((item) => (
+                <li key={item.taskId}>
+                  <Link
+                    href={`/approvals/${item.instanceId}`}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 hover:bg-muted/50"
+                  >
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {item.contractNo}
+                    </span>
+                    <span className="flex-1 text-sm font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {item.nodeName} · {formatMoney(item.amount, item.currency)}
+                    </span>
+                    {item.delegated ? <Badge variant="outline">受托代办</Badge> : null}
+                    {item.overdue ? <Badge variant="destructive">已超期</Badge> : null}
+                    {item.dueAt ? (
                       <span className="text-xs text-muted-foreground">
-                        {task.nodeRun.nodeName}
+                        截止 {formatDateTime(item.dueAt)}
                       </span>
-                      {overdue ? (
-                        <Badge variant="destructive">已超期</Badge>
-                      ) : null}
-                      <span className="text-xs text-muted-foreground">
-                        到达 {formatDateTime(task.createdAt)}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card id="initiated">
+          <CardHeader>
+            <CardTitle>我发起的</CardTitle>
+            <CardDescription>在途审批的合同与当前节点</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {workbench.initiated.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                暂无在途合同。
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {workbench.initiated.map((item) => (
+                  <li key={item.instanceId} className="py-3">
+                    <Link
+                      href={`/contracts/${item.contractId}`}
+                      className="text-sm font-medium hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">{item.contractNo}</span>
+                      <Badge variant="outline">
+                        {contractStatusLabel(item.contractStatus)}
+                      </Badge>
+                      <span>{formatMoney(item.amount, item.currency)}</span>
+                      <span>
+                        当前节点：
+                        {item.currentNodeNames.length > 0
+                          ? item.currentNodeNames.join("、")
+                          : "—"}
+                      </span>
+                      <span>提交 {formatDate(item.startedAt)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card id="cc">
+          <CardHeader>
+            <CardTitle>抄送我的</CardTitle>
+            <CardDescription>只需备案查阅，不需要处理</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {workbench.cc.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                暂无抄送。
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {workbench.cc.map((item) => (
+                  <li key={item.contractId} className="py-3">
+                    <Link
+                      href={`/contracts/${item.contractId}`}
+                      className="text-sm font-medium hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">{item.contractNo}</span>
+                      <Badge variant="outline">
+                        {contractStatusLabel(item.contractStatus)}
+                      </Badge>
+                      <span>{formatMoney(item.amount, item.currency)}</span>
+                      <span>{formatDate(item.createdAt)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {workbench.overdue.length > 0 ? (
+        <Card id="overdue">
+          <CardHeader>
+            <CardTitle>已超期待办</CardTitle>
+            <CardDescription>超过节点设定时限，请尽快处理</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y">
+              {workbench.overdue.map((item) => (
+                <li key={item.taskId}>
+                  <Link
+                    href={`/approvals/${item.instanceId}`}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 hover:bg-muted/50"
+                  >
+                    <Badge variant="destructive">超期</Badge>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {item.contractNo}
+                    </span>
+                    <span className="flex-1 text-sm font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {item.nodeName} · 截止 {formatDateTime(item.dueAt ?? item.createdAt)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

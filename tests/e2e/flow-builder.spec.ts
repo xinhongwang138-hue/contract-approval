@@ -21,13 +21,11 @@ async function assignToAdmin(page: Page): Promise<void> {
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("审批人来源").click();
   await page.getByRole("option", { name: "指定人员" }).click();
-  await dialog.getByPlaceholder("搜索姓名或部门").fill("系统管理员");
-  await dialog
-    .locator("label")
-    .filter({ hasText: "系统管理员" })
-    .first()
-    .getByRole("checkbox")
-    .check();
+  await dialog.getByPlaceholder("输入姓名或邮箱，回车搜索").fill("admin@example.com");
+  await dialog.getByRole("button", { name: "搜索" }).click();
+  const row = dialog.locator("label").filter({ hasText: "系统管理员" }).first();
+  await expect(row).toBeVisible();
+  await row.getByRole("checkbox").check();
   await dialog.getByRole("button", { name: "应用属性" }).click();
 }
 

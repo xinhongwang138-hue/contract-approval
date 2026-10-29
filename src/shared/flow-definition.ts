@@ -23,6 +23,53 @@ export const FLOW_NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
   end: "结束",
 };
 
+export const FLOW_STATUS_LABELS: Record<string, string> = {
+  running: "审批中",
+  approved: "已通过",
+  rejected: "已驳回",
+  withdrawn: "已撤回",
+  terminated: "已终止",
+  cancelled: "已取消",
+};
+
+export const NODE_RUN_STATUS_LABELS: Record<string, string> = {
+  pending: "等待进入",
+  running: "进行中",
+  waiting_join: "等待汇聚",
+  approved: "已通过",
+  rejected: "已驳回",
+  skipped: "已跳过",
+  cancelled: "已取消",
+};
+
+export const TASK_STATUS_LABELS: Record<string, string> = {
+  pending: "待处理",
+  approved: "已同意",
+  rejected: "已驳回",
+  transferred: "已转签",
+  cancelled: "已取消",
+  expired: "已超时",
+};
+
+export const TASK_ACTION_LABELS: Record<string, string> = {
+  approve: "同意",
+  reject: "驳回",
+  return: "退回修改",
+  transfer: "转签",
+  add_sign: "加签",
+  withdraw: "撤回",
+  timeout_remind: "超时提醒",
+  auto_approve: "超时自动通过",
+  auto_reject: "超时自动驳回",
+  system: "系统处理",
+};
+
+export const ADD_SIGN_TYPE_LABELS: Record<string, string> = {
+  before: "前加签",
+  after: "后加签",
+  parallel: "并加签",
+};
+
 export const APPROVAL_MODES = ["all", "any", "sequential"] as const;
 export type ApprovalMode = (typeof APPROVAL_MODES)[number];
 

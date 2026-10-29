@@ -56,10 +56,30 @@ export type FlowOption = { id: string; name: string; code: string; latestVersion
 
 export type FlowActorOptions = {
   roles: { key: string; name: string }[];
-  users: { id: string; name: string; departmentName: string | null }[];
+  users: { id: string; name: string; email: string; departmentName: string | null }[];
 };
 
-export async function listFlowActorOptions(): Promise<FlowActorOptions> {
+function collectReferencedUserIds(definition: unknown): string[] {
+  const nodes = (definition as { nodes?: unknown } | null)?.nodes;
+  if (!Array.isArray(nodes)) {
+    return [];
+  }
+  const ids = new Set<string>();
+  for (const node of nodes) {
+    const assignee = (node as { assignee?: { ids?: unknown } } | null)?.assignee;
+    if (Array.isArray(assignee?.ids)) {
+      for (const id of assignee.ids) {
+        if (typeof id === "string") {
+          ids.add(id);
+        }
+      }
+    }
+  }
+  return [...ids];
+}
+
+export async function listFlowActorOptions(definition: unknown): Promise<FlowActorOptions> {
+  const referencedUserIds = collectReferencedUserIds(definition);
   const [roles, users] = await Promise.all([
     prisma.role.findMany({
       where: { deletedAt: null },
@@ -67,12 +87,12 @@ export async function listFlowActorOptions(): Promise<FlowActorOptions> {
       select: { key: true, name: true },
     }),
     prisma.user.findMany({
-      where: { deletedAt: null, status: "active" },
+      where: { id: { in: referencedUserIds } },
       orderBy: { name: "asc" },
-      take: 200,
       select: {
         id: true,
         name: true,
+        email: true,
         department: { select: { name: true } },
       },
     }),
@@ -83,6 +103,7 @@ export async function listFlowActorOptions(): Promise<FlowActorOptions> {
     users: users.map((user) => ({
       id: user.id,
       name: user.name,
+      email: user.email,
       departmentName: user.department?.name ?? null,
     })),
   };

@@ -43,8 +43,34 @@ export function shanghaiYearMonth(date: Date = new Date()): string {
   return `${year}${month}`;
 }
 
+const dateInputFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+// 给 <input type="date"> 用的上海时区 yyyy-MM-dd。
+export function toDateInputValue(value: Date): string {
+  return dateInputFormatter.format(value);
+}
+
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setUTCDate(result.getUTCDate() + days);
   return result;
+}
+
+// Asia/Shanghai 固定 UTC+8（无夏令时），按日界换算成 UTC 存储。
+export function parseShanghaiDate(value: string, endOfDay = false): Date {
+  const hour = endOfDay ? 23 : 0;
+  const minute = endOfDay ? 59 : 0;
+  const second = endOfDay ? 59 : 0;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    throw new Error(`无法解析日期：${value}`);
+  }
+  return new Date(
+    Date.UTC(year, month - 1, day, hour - 8, minute, second),
+  );
 }

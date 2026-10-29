@@ -13,6 +13,7 @@ import {
 } from "@/server/actions/flows";
 import { validateFlowDefinition } from "@/server/flow/validate";
 import type { FlowValidationIssue } from "@/server/flow/validate";
+import type { UserOption } from "@/server/actions/user-search";
 import { FlowTree } from "./flow-tree";
 import { NodeConfigSheet } from "./node-config-sheet";
 import {
@@ -40,7 +41,7 @@ export type FlowBuilderProps = {
   canEdit: boolean;
   canPublish: boolean;
   roles: { key: string; name: string }[];
-  users: { id: string; name: string; departmentName: string | null }[];
+  users: UserOption[];
 };
 
 export function FlowBuilder(props: FlowBuilderProps) {

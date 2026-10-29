@@ -11,5 +11,7 @@ test-results
 src/generated
 storage
 tests/.tmp
+.pw-artifacts
+.pw-run
 *.log
 .DS_Store

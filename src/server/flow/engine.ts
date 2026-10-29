@@ -1266,8 +1266,10 @@ export async function decideTask(
     action: FlowDecisionAction;
     opinion?: string;
     options?: EngineCallOptions;
+    operatorId?: string;
   },
 ): Promise<FlowActionResult> {
+  const operatorId = input.operatorId ?? input.actorId;
   const task = await db.flowTask.findFirst({ where: { id: input.taskId, deletedAt: null } });
   if (!task) {
     throw new AppError(ERROR_CODES.NOT_FOUND, "审批任务不存在");
@@ -1314,7 +1316,7 @@ export async function decideTask(
       action: input.action,
       opinion: opinion === "" ? null : opinion,
       decidedAt: new Date(),
-      decidedBy: input.actorId,
+      decidedBy: operatorId,
     },
   });
   if (claimed.count === 0) {
@@ -1324,7 +1326,7 @@ export async function decideTask(
     instanceId: instance.id,
     nodeRunId: run.id,
     taskId: task.id,
-    actorId: input.actorId,
+    actorId: operatorId,
     action: `task.${input.action}`,
     from: "pending",
     to: toStatus,
@@ -1335,13 +1337,13 @@ export async function decideTask(
 
   const activated: string[] = [];
   if (input.action === "return") {
-    await returnToInitiator(db, instance, run, node, input.actorId, opinion);
+    await returnToInitiator(db, instance, run, node, operatorId, opinion);
   } else {
     await evaluateNodeOutcome(
       db,
       instance,
       run,
-      input.actorId,
+      operatorId,
       opinion || undefined,
       input.options ?? {},
       activated,
@@ -1429,8 +1431,10 @@ async function transferTaskInternal(
     reason: string;
     options?: EngineCallOptions;
     requireCapability: boolean;
+    operatorId?: string;
   },
 ): Promise<{ taskId: string }> {
+  const operatorId = input.operatorId ?? input.actorId;
   const task = await db.flowTask.findFirst({ where: { id: input.taskId, deletedAt: null } });
   if (!task) {
     throw new AppError(ERROR_CODES.NOT_FOUND, "审批任务不存在");
@@ -1474,7 +1478,7 @@ async function transferTaskInternal(
       action: "transfer",
       opinion: input.reason,
       decidedAt: new Date(),
-      decidedBy: input.actorId,
+      decidedBy: operatorId,
     },
   });
   if (claimed.count === 0) {
@@ -1515,7 +1519,7 @@ async function transferTaskInternal(
   });
 
   const activated: string[] = [];
-  await evaluateNodeOutcome(db, instance, run, input.actorId, undefined, input.options ?? {}, activated);
+  await evaluateNodeOutcome(db, instance, run, operatorId, undefined, input.options ?? {}, activated);
   return { taskId: created.id };
 }
 
@@ -1527,6 +1531,7 @@ export async function transferTask(
     targetUserId: string;
     reason: string;
     options?: EngineCallOptions;
+    operatorId?: string;
   },
 ): Promise<{ taskId: string }> {
   return transferTaskInternal(db, { ...input, requireCapability: true });
@@ -1541,8 +1546,10 @@ export async function addSignToTask(
     assigneeIds: string[];
     reason: string;
     options?: EngineCallOptions;
+    operatorId?: string;
   },
 ): Promise<{ addedTaskIds: string[] }> {
+  const operatorId = input.operatorId ?? input.actorId;
   const task = await db.flowTask.findFirst({ where: { id: input.taskId, deletedAt: null } });
   if (!task) {
     throw new AppError(ERROR_CODES.NOT_FOUND, "审批任务不存在");
@@ -1630,7 +1637,7 @@ export async function addSignToTask(
       instanceId: instance.id,
       nodeRunId: run.id,
       taskId: task.id,
-      actorId: input.actorId,
+      actorId: operatorId,
       action: "task.add_sign",
       detail: { position: "after", assigneeIds: validIds, reason: input.reason },
     });
@@ -1662,7 +1669,7 @@ export async function addSignToTask(
       instanceId: instance.id,
       nodeRunId: run.id,
       taskId: task.id,
-      actorId: input.actorId,
+      actorId: operatorId,
       action: "task.blocked_by_add_sign",
       detail: { position: "before", blockedByNodeRunId: blockedRunId },
     });

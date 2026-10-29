@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { UserPicker } from "@/components/user-picker";
+import type { UserOption } from "@/server/actions/user-search";
 import {
   APPROVAL_MODE_LABELS,
   APPROVAL_MODES,
@@ -88,6 +90,24 @@ function Field({
   );
 }
 
+function FieldGroup({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <fieldset className="grid gap-1.5">
+      <legend className="text-sm font-medium leading-none">{label}</legend>
+      {children}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+    </fieldset>
+  );
+}
+
 function readAssignee(node: NodeRecord): Record<string, unknown> {
   const value = node.assignee;
   return value && typeof value === "object" ? (value as Record<string, unknown>) : { kind: "role" };
@@ -98,7 +118,7 @@ type SheetProps = {
   nodeId: string | null;
   open: boolean;
   roles: { key: string; name: string }[];
-  users: { id: string; name: string; departmentName: string | null }[];
+  users: UserOption[];
   canEdit: boolean;
   onOpenChange: (open: boolean) => void;
   onApply: (nodeId: string, patch: NodeRecord) => void;
@@ -136,7 +156,6 @@ function NodeDraft({
   const [draft, setDraft] = useState<NodeRecord>(() =>
     JSON.parse(JSON.stringify(node)) as NodeRecord,
   );
-  const [userFilter, setUserFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const type = nodeType(node);
@@ -185,15 +204,11 @@ function NodeDraft({
     onApply(nodeId, cleaned);
   }
 
-  const visibleUsers = users
-    .filter((user) =>
-      userFilter.trim() === ""
-        ? true
-        : `${user.name}${user.departmentName ?? ""}`.includes(userFilter.trim()),
-    )
-    .slice(0, 30);
-
-  const selectedUsers = Array.isArray(assignee.ids) ? (assignee.ids as string[]) : [];
+  const selectedIds = Array.isArray(assignee.ids) ? (assignee.ids as string[]) : [];
+  const knownUsers = new Map(users.map((user) => [user.id, user]));
+  const selectedUsers: UserOption[] = selectedIds.map(
+    (id) => knownUsers.get(id) ?? { id, name: id, email: "", departmentName: null },
+  );
 
   return (
     <>
@@ -259,44 +274,22 @@ function NodeDraft({
               ) : null}
 
               {(assignee.kind ?? "role") === "user" ? (
-                <Field label="指定人员" htmlFor="node-user-search" hint="最多勾选 10 人，运行时自动去重。">
-                  <Input
+                <Field label="指定人员" htmlFor="node-user-search" hint="服务端按姓名/邮箱搜索，最多 10 人。">
+                  <UserPicker
                     id="node-user-search"
-                    value={userFilter}
-                    placeholder="搜索姓名或部门"
-                    onChange={(event) => setUserFilter(event.target.value)}
-                    className="mb-2"
+                    multi
+                    disabled={!canEdit}
+                    selected={selectedUsers}
+                    initialUsers={selectedUsers}
+                    onChange={(next) => patchAssignee({ ids: next.map((user) => user.id) })}
                   />
-                  <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
-                    {visibleUsers.map((user) => (
-                      <label
-                        key={user.id}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <Checkbox
-                          checked={selectedUsers.includes(user.id)}
-                          disabled={!canEdit}
-                          onCheckedChange={(checked) => {
-                            const next = checked
-                              ? [...selectedUsers, user.id]
-                              : selectedUsers.filter((id) => id !== user.id);
-                            patchAssignee({ ids: next });
-                          }}
-                        />
-                        <span className="truncate">{user.name}</span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                          {user.departmentName ?? "未分配部门"}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
                 </Field>
               ) : null}
 
               {assignee.kind === "dept_manager" ? (
                 <Field label="向上第 N 级主管" htmlFor="node-level" hint="跳过没有主管的部门后计数。">
                   <Input
-                    id="node-form-field"
+                    id="node-level"
                     type="number"
                     min={1}
                     max={10}
@@ -341,9 +334,13 @@ function NodeDraft({
               ) : null}
 
               {assignee.kind === "form_field" ? (
-                <Field label="表单字段标识" htmlFor="node-form-field" hint="字段值填用户 iD 或邮箱，支持逗号分隔。">
+                <Field
+                  label="表单字段标识"
+                  htmlFor="node-form-field"
+                  hint="字段值填用户 userId 或邮箱，支持逗号分隔。"
+                >
                   <Input
-                    id="node-level"
+                    id="node-form-field"
                     value={String(assignee.field ?? "")}
                     disabled={!canEdit}
                     onChange={(event) => patchAssignee({ field: event.target.value })}
@@ -557,7 +554,10 @@ function NodeDraft({
                 ) : null}
               </div>
 
-              <Field label="必须填写意见的动作" htmlFor="node-opinion-approve">
+              <FieldGroup
+                label="必须填写意见的动作"
+                hint="选中后，该动作必须填写审批意见才能提交。"
+              >
                 <div className="flex flex-wrap gap-4">
                   {(["approve", "reject", "return"] as const).map((action) => {
                     const list = Array.isArray(draft.requiredOpinionOn)
@@ -566,7 +566,6 @@ function NodeDraft({
                     return (
                       <label key={action} className="flex items-center gap-2 text-sm">
                         <Checkbox
-                          id={action === "approve" ? "node-opinion-approve" : undefined}
                           checked={list.includes(action)}
                           disabled={!canEdit}
                           onCheckedChange={(checked) =>
@@ -582,9 +581,9 @@ function NodeDraft({
                     );
                   })}
                 </div>
-              </Field>
+              </FieldGroup>
 
-              <Field label="节点能力" htmlFor="node-addsign-before">
+              <FieldGroup label="节点能力">
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-4">
                     {ADD_SIGN_POSITIONS.map((position) => {
@@ -597,7 +596,6 @@ function NodeDraft({
                           className="flex items-center gap-2 text-sm"
                         >
                           <Checkbox
-                            id={position === "before" ? "node-addsign-before" : undefined}
                             checked={list.includes(position)}
                             disabled={!canEdit}
                             onCheckedChange={(checked) =>
@@ -641,7 +639,7 @@ function NodeDraft({
                     ))}
                   </div>
                 </div>
-              </Field>
+              </FieldGroup>
 
               <Field label="可见字段" htmlFor="node-visible-keys" hint="逗号分隔的字段标识，留空表示全部可见。">
                 <Input
@@ -666,7 +664,7 @@ function NodeDraft({
           ) : null}
 
           {type === "condition" ? (
-            <Field label="分支配置" htmlFor="branch-0-name" hint="默认分支的 when 固定为 null，且只能有一个。">
+            <FieldGroup label="分支配置" hint="默认分支的 when 固定为 null，且只能有一个。">
               <div className="space-y-3">
                 {readBranches(draft).map((branch, index) => (
                   <BranchEditor
@@ -683,7 +681,7 @@ function NodeDraft({
                   />
                 ))}
               </div>
-            </Field>
+            </FieldGroup>
           ) : null}
 
           {type === "action" ? (

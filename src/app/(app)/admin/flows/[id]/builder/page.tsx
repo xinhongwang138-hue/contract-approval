@@ -37,7 +37,7 @@ export default async function FlowBuilderPage({
     throw error;
   }
 
-  const actors = await listFlowActorOptions();
+  const actors = await listFlowActorOptions(flow.draftDefinition);
 
   return (
     <div className="space-y-6">

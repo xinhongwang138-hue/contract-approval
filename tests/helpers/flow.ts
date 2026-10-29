@@ -215,8 +215,13 @@ export async function resetFlowData(): Promise<void> {
   await prisma.flowTask.deleteMany();
   await prisma.flowNodeRun.deleteMany();
   await prisma.flowInstance.deleteMany();
+  await prisma.contractTemplate.updateMany({
+    where: { flowId: { not: null } },
+    data: { flowId: null },
+  });
   await prisma.approvalFlowVersion.deleteMany();
   await prisma.approvalFlow.deleteMany();
+  await prisma.delegate.deleteMany();
   await prisma.contractParticipant.deleteMany();
   await prisma.contractMilestone.deleteMany();
   await prisma.sealRecord.deleteMany();
