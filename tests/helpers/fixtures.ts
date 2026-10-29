@@ -59,21 +59,25 @@ export async function createTestUser(input: {
   email: string;
   roleKey: string;
   departmentId?: string | null;
+  managerUserId?: string | null;
+  status?: "active" | "disabled";
 }): Promise<{ id: string; email: string }> {
   const user = await prisma.user.upsert({
     where: { email: input.email },
     update: {
       name: input.name,
-      status: "active",
+      status: input.status ?? "active",
       deletedAt: null,
       departmentId: input.departmentId ?? null,
+      managerUserId: input.managerUserId ?? null,
     },
     create: {
       name: input.name,
       email: input.email,
       emailVerified: true,
-      status: "active",
+      status: input.status ?? "active",
       departmentId: input.departmentId ?? null,
+      managerUserId: input.managerUserId ?? null,
     },
   });
 
@@ -98,7 +102,35 @@ export async function ensureTestDepartment(): Promise<{ id: string; path: string
   return { id: department.id, path: department.path };
 }
 
+export async function createTestDepartment(input: {
+  name: string;
+  path: string;
+  parentId?: string | null;
+  managerUserId?: string | null;
+}): Promise<{ id: string; path: string }> {
+  const department = await prisma.department.upsert({
+    where: { path: input.path },
+    update: {
+      name: input.name,
+      parentId: input.parentId ?? null,
+      managerUserId: input.managerUserId ?? null,
+      deletedAt: null,
+    },
+    create: {
+      name: input.name,
+      path: input.path,
+      parentId: input.parentId ?? null,
+      managerUserId: input.managerUserId ?? null,
+    },
+  });
+  return { id: department.id, path: department.path };
+}
+
 export async function resetContractData(): Promise<void> {
+  await prisma.contract.updateMany({
+    where: { currentFlowInstanceId: { not: null } },
+    data: { currentFlowInstanceId: null },
+  });
   await prisma.attachment.deleteMany();
   await prisma.contractVersion.deleteMany();
   await prisma.contractMilestone.deleteMany();
