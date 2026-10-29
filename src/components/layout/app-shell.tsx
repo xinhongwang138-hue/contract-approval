@@ -73,7 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Workflow,
         permissions: ["flow.create", "flow.publish", "flow.manage"],
       },
-      { href: "/admin/templates", label: "合同模板", icon: FileStack, permissions: ["contract.create"] },
+      { href: "/admin/templates", label: "合同模板", icon: FileStack, permissions: ["flow.manage"] },
       { href: "/admin/parties", label: "相对方", icon: Building2, permissions: ["contract.create"] },
       { href: "/admin/departments", label: "部门", icon: Network, permissions: ["system.user.manage"] },
       { href: "/admin/users", label: "用户", icon: Users, permissions: ["system.user.manage"] },

@@ -1,5 +1,10 @@
 import type { ZodError } from "zod";
-import { AppError, ERROR_CODES, type ActionFailure } from "@/shared/errors";
+import {
+  AppError,
+  ERROR_CODES,
+  ValidationError,
+  type ActionFailure,
+} from "@/shared/errors";
 
 export function zodFailure(error: ZodError): ActionFailure {
   const fields: Record<string, string> = {};
@@ -23,7 +28,11 @@ export function toFailure(error: unknown): ActionFailure {
       ok: false,
       code: error.code,
       message: error.message,
-      fields: undefined,
+      fields:
+        error instanceof ValidationError &&
+        Object.keys(error.fields).length > 0
+          ? error.fields
+          : undefined,
     };
   }
   return {

@@ -34,6 +34,16 @@ export class AppError extends Error {
   }
 }
 
+export class ValidationError extends AppError {
+  readonly fields: Record<string, string>;
+
+  constructor(message: string, fields?: Record<string, string>) {
+    super(ERROR_CODES.VALIDATION_FAILED, message);
+    this.name = "ValidationError";
+    this.fields = fields ?? {};
+  }
+}
+
 export class IllegalTransitionError extends AppError {
   constructor(machine: string, from: string, to: string) {
     super(

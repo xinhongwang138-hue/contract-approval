@@ -10,5 +10,6 @@ test-results
 .env.*.local
 src/generated
 storage
+tests/.tmp
 *.log
 .DS_Store

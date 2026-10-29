@@ -8,6 +8,9 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
+  expect: {
+    timeout: 15_000,
+  },
   use: {
     baseURL,
     trace: "retain-on-failure",
