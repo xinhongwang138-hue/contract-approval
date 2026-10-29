@@ -5,7 +5,7 @@ import {
   PERMISSION_KEYS,
   ROLE_DEFINITIONS,
 } from "@/shared/permissions";
-import { ensureTestDatabase } from "./db";
+import { deleteAsOwner, ensureTestDatabase } from "./db";
 
 export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
@@ -127,10 +127,17 @@ export async function createTestDepartment(input: {
 }
 
 export async function resetContractData(): Promise<void> {
+  // 合同被审批实例引用，重置必须连流程运行数据一起清，否则外键挡住删除。
+  await deleteAsOwner('DELETE FROM "FlowEventLog"');
+  await prisma.flowTask.deleteMany();
+  await prisma.flowNodeRun.deleteMany();
   await prisma.contract.updateMany({
     where: { currentFlowInstanceId: { not: null } },
     data: { currentFlowInstanceId: null },
   });
+  await prisma.flowInstance.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.idempotencyKey.deleteMany();
   await prisma.attachment.deleteMany();
   await prisma.contractVersion.deleteMany();
   await prisma.contractMilestone.deleteMany();

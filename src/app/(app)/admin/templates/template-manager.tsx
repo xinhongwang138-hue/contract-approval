@@ -17,6 +17,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -26,6 +33,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  bindTemplateFlowAction,
+} from "@/server/actions/flows";
 import { saveTemplateAction, toggleTemplateActiveAction } from "@/server/actions/templates";
 
 export type TemplateRow = {
@@ -36,14 +46,19 @@ export type TemplateRow = {
   active: boolean;
   fieldCount: number;
   contractCount: number;
+  flowId: string | null;
+  flowName: string | null;
   updatedAtLabel: string;
 };
+
+export type FlowChoice = { id: string; name: string; code: string; latestVersion: number };
 
 type FormState = {
   code: string;
   name: string;
   category: string;
   active: boolean;
+  flowId: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -51,9 +66,16 @@ const EMPTY_FORM: FormState = {
   name: "",
   category: "",
   active: true,
+  flowId: "",
 };
 
-export function TemplateManager({ templates }: { templates: TemplateRow[] }) {
+export function TemplateManager({
+  templates,
+  flows,
+}: {
+  templates: TemplateRow[];
+  flows: FlowChoice[];
+}) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TemplateRow | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -76,6 +98,7 @@ export function TemplateManager({ templates }: { templates: TemplateRow[] }) {
       name: row.name,
       category: row.category,
       active: row.active,
+      flowId: row.flowId ?? "",
     });
     setFieldErrors({});
     setDialogOpen(true);
@@ -94,13 +117,23 @@ export function TemplateManager({ templates }: { templates: TemplateRow[] }) {
 
     startSaving(async () => {
       const result = await saveTemplateAction(data);
-      if (result.ok) {
-        toast.success(editing ? "模板已更新" : "模板已创建，请继续配置字段");
-        setDialogOpen(false);
+      if (!result.ok) {
+        setFieldErrors(result.fields ?? {});
+        toast.error(result.message);
         return;
       }
-      setFieldErrors(result.fields ?? {});
-      toast.error(result.message);
+
+      const previousFlowId = editing?.flowId ?? "";
+      if (form.flowId !== previousFlowId) {
+        const bound = await bindTemplateFlowAction(result.data.id, form.flowId || null);
+        if (!bound.ok) {
+          toast.error(bound.message);
+          return;
+        }
+      }
+
+      toast.success(editing ? "模板已更新" : "模板已创建，请继续配置字段");
+      setDialogOpen(false);
     });
   }
 
@@ -133,6 +166,7 @@ export function TemplateManager({ templates }: { templates: TemplateRow[] }) {
               <TableHead>模板名称</TableHead>
               <TableHead>编码</TableHead>
               <TableHead>分类</TableHead>
+              <TableHead>关联审批流</TableHead>
               <TableHead className="text-right">字段数</TableHead>
               <TableHead className="text-right">关联合同</TableHead>
               <TableHead>状态</TableHead>
@@ -153,6 +187,9 @@ export function TemplateManager({ templates }: { templates: TemplateRow[] }) {
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell className="font-mono text-xs">{row.code}</TableCell>
                   <TableCell>{row.category}</TableCell>
+                  <TableCell className="text-sm">
+                    {row.flowName ?? <span className="text-muted-foreground">未关联</span>}
+                  </TableCell>
                   <TableCell className="text-right">{row.fieldCount}</TableCell>
                   <TableCell className="text-right">{row.contractCount}</TableCell>
                   <TableCell>
@@ -256,6 +293,36 @@ export function TemplateManager({ templates }: { templates: TemplateRow[] }) {
                 {fieldErrors["category"] ? (
                   <p className="text-xs text-destructive">{fieldErrors["category"]}</p>
                 ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="template-flow">关联审批流</Label>
+                <Select
+                  value={form.flowId || "none"}
+                  onValueChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      flowId: value === "none" ? "" : value,
+                    }))
+                  }
+                >
+                  <SelectTrigger id="template-flow" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">暂不关联</SelectItem>
+                    {flows
+                      .filter((flow) => flow.latestVersion > 0)
+                      .map((flow) => (
+                        <SelectItem key={flow.id} value={flow.id}>
+                          {flow.name}（v{flow.latestVersion}）
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  只能关联已发布的流程；合同提交时按模板关联的流程开实例。
+                </p>
               </div>
 
               <div className="flex items-center justify-between rounded-md border px-3 py-2">

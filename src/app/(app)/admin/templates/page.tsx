@@ -2,6 +2,7 @@ import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { getAccessContext } from "@/server/auth/access";
 import { requirePageAuth } from "@/server/auth/session";
+import { listFlowOptions } from "@/server/services/flow";
 import { listContractTemplates } from "@/server/services/contract-template";
 import { formatDateTime } from "@/shared/datetime";
 import { TemplateManager, type TemplateRow } from "./template-manager";
@@ -16,7 +17,10 @@ export default async function TemplatesPage() {
     return <AccessDenied permission="flow.manage" />;
   }
 
-  const templates = await listContractTemplates();
+  const [templates, flows] = await Promise.all([
+    listContractTemplates(),
+    listFlowOptions(),
+  ]);
   const rows: TemplateRow[] = templates.map((template) => ({
     id: template.id,
     code: template.code,
@@ -25,6 +29,8 @@ export default async function TemplatesPage() {
     active: template.active,
     fieldCount: template.fieldCount,
     contractCount: template.contractCount,
+    flowId: template.flowId,
+    flowName: template.flowName,
     updatedAtLabel: formatDateTime(template.updatedAt),
   }));
 
@@ -35,7 +41,7 @@ export default async function TemplatesPage() {
         description="模板决定动态表单字段与默认审批流，编码参与合同编号生成。"
       />
       <p className="text-xs text-muted-foreground">共 {rows.length} 个模板</p>
-      <TemplateManager templates={rows} />
+      <TemplateManager templates={rows} flows={flows} />
     </div>
   );
 }
