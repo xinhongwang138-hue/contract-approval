@@ -648,6 +648,63 @@ async function processQueue(
       continue;
     }
 
+    if (node.type === "join") {
+      const awaiting = incomingEdgeCount(instance.definition, node.id);
+      const priorRuns = await loadRuns(db, instance.id);
+      const waiting = priorRuns.find(
+        (item) => item.nodeId === node.id && item.status === "waiting_join",
+      );
+      // 只有首次到达才建行：每次到达都建一条的话，后面那条永远停在 running，
+      // finishInstance 的「无未完成 run」守卫会永久挡住收尾，实例死锁。
+      const run =
+        waiting ??
+        (await setRunStatus(
+          db,
+          await createNodeRun(db, {
+            instanceId: instance.id,
+            node,
+            attempt: nextAttempt(priorRuns, node.id),
+          }),
+          "running",
+        ));
+      const joined = run.joinedCount + 1;
+      await db.flowNodeRun.update({
+        where: { id: run.id },
+        data: { joinedCount: joined, awaitingCount: awaiting, version: { increment: 1 } },
+      });
+      const current = {
+        ...run,
+        joinedCount: joined,
+        awaitingCount: awaiting,
+        version: run.version + 1,
+      };
+
+      if (!isJoinReady(joined, awaiting)) {
+        if (!waiting) {
+          await setRunStatus(db, current, "waiting_join");
+        }
+        await logEvent(db, {
+          instanceId: instance.id,
+          nodeRunId: run.id,
+          actorId: SYSTEM_ACTOR,
+          action: waiting ? "node.join_arrived" : "node.waiting_join",
+          detail: { joined, awaiting },
+        });
+        continue;
+      }
+
+      await setRunStatus(db, current, "approved", { finishedAt: new Date() });
+      await logEvent(db, {
+        instanceId: instance.id,
+        nodeRunId: run.id,
+        actorId: SYSTEM_ACTOR,
+        action: "node.joined",
+        detail: { joined, awaiting },
+      });
+      pending.unshift(...collectNodeTargets(node).map((t) => ({ nodeId: t })));
+      continue;
+    }
+
     const runs = await loadRuns(db, instance.id);
     const attempt = nextAttempt(runs, node.id);
     let run = await createNodeRun(db, { instanceId: instance.id, node, attempt });
@@ -721,72 +778,6 @@ async function processQueue(
       await runActionNode(db, instance, node, options);
       await setRunStatus(db, run, "approved", { finishedAt: new Date() });
       pending.unshift(...collectNodeTargets(node).map((target) => ({ nodeId: target })));
-      continue;
-    }
-
-    if (node.type === "join") {
-      const awaiting = incomingEdgeCount(instance.definition, node.id);
-      const waiting = runs.find(
-        (item) => item.nodeId === node.id && item.status === "waiting_join",
-      );
-      if (waiting) {
-        const joined = waiting.joinedCount + 1;
-        await db.flowNodeRun.update({
-          where: { id: waiting.id },
-          data: { joinedCount: joined, version: { increment: 1 } },
-        });
-        await logEvent(db, {
-          instanceId: instance.id,
-          nodeRunId: waiting.id,
-          actorId: SYSTEM_ACTOR,
-          action: "node.join_arrived",
-          detail: { joined, awaiting },
-        });
-        if (!isJoinReady(joined, awaiting)) {
-          continue;
-        }
-        await setRunStatus(
-          db,
-          { ...waiting, joinedCount: joined, version: waiting.version + 1 },
-          "approved",
-          { finishedAt: new Date() },
-        );
-        await logEvent(db, {
-          instanceId: instance.id,
-          nodeRunId: waiting.id,
-          actorId: SYSTEM_ACTOR,
-          action: "node.joined",
-          detail: { joined, awaiting },
-        });
-        pending.unshift(...collectNodeTargets(node).map((t) => ({ nodeId: t })));
-        continue;
-      }
-
-      await db.flowNodeRun.update({
-        where: { id: run.id },
-        data: { joinedCount: 1, awaitingCount: awaiting, version: { increment: 1 } },
-      });
-      const first = { ...run, joinedCount: 1, awaitingCount: awaiting, version: run.version + 1 };
-      if (!isJoinReady(1, awaiting)) {
-        await setRunStatus(db, first, "waiting_join");
-        await logEvent(db, {
-          instanceId: instance.id,
-          nodeRunId: run.id,
-          actorId: SYSTEM_ACTOR,
-          action: "node.waiting_join",
-          detail: { joined: 1, awaiting },
-        });
-        continue;
-      }
-      await setRunStatus(db, first, "approved", { finishedAt: new Date() });
-      await logEvent(db, {
-        instanceId: instance.id,
-        nodeRunId: run.id,
-        actorId: SYSTEM_ACTOR,
-        action: "node.joined",
-        detail: { joined: 1, awaiting },
-      });
-      pending.unshift(...collectNodeTargets(node).map((t) => ({ nodeId: t })));
       continue;
     }
 
