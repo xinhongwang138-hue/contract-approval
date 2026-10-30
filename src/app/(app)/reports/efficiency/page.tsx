@@ -20,6 +20,9 @@ function formatHours(value: number | null): string {
   if (value === null) {
     return "—";
   }
+  if (value < 1 / 60) {
+    return `${Math.max(0, Math.round(value * 3600))} 秒`;
+  }
   if (value < 1) {
     return `${Math.round(value * 60)} 分钟`;
   }

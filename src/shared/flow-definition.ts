@@ -51,6 +51,13 @@ export const TASK_STATUS_LABELS: Record<string, string> = {
   expired: "已超时",
 };
 
+// 审计里的 from → to 可能是实例 / 节点 / 任务三种状态之一，按此顺序合并取标签。
+export const FLOW_STATE_LABELS: Record<string, string> = {
+  ...FLOW_STATUS_LABELS,
+  ...NODE_RUN_STATUS_LABELS,
+  ...TASK_STATUS_LABELS,
+};
+
 export const TASK_ACTION_LABELS: Record<string, string> = {
   approve: "同意",
   reject: "驳回",

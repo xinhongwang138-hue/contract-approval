@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { archiveContractAction } from "@/server/actions/lifecycle";
 import { CONTRACT_STATUS_LABELS } from "@/shared/contract-status";
 import { formatDate } from "@/shared/datetime";
+import { formatMoney } from "@/shared/money";
 import type { ContractStatus } from "@/shared/state-machines";
 
 export type ArchiveRowView = {
@@ -144,7 +145,9 @@ export function ArchiveManager({
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {row.no}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">¥{row.amount}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMoney(row.amount)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={row.status === "archived" ? "outline" : "secondary"}>
                         {CONTRACT_STATUS_LABELS[row.status]}

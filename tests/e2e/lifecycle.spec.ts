@@ -243,6 +243,24 @@ test.describe("用印与归档", () => {
     await expect(
       admin.getByRole("row", { name: new RegExp(contractTitle) }),
     ).toBeVisible({ timeout: 30_000 });
+
+    // 通知中心：先证明页面能打开（RSC 边界），再证明 kind 被翻译成中文。
+    // notifications/page.tsx:105 是 KIND_LABELS[item.kind] ?? item.kind，
+    // 字典缺项不会报错，只会静默把原始英文漏到徽标上。
+    await admin.goto("/notifications");
+    await expect(admin.getByRole("heading", { name: "消息通知" })).toBeVisible({
+      timeout: 30_000,
+    });
+    // 本轮链路给发起人（admin）产生了 seal（取件/归还）与 archive（归档）两类通知
+    const noticeBadges = admin.getByRole("listitem").locator('[data-slot="badge"]');
+    await expect(noticeBadges.filter({ hasText: /^用印$/ }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(noticeBadges.filter({ hasText: /^归档$/ }).first()).toBeVisible();
+    // 兜底：任何未翻译的原始 kind 都不该出现在徽标上
+    await expect(
+      noticeBadges.filter({ hasText: /^(task|cc|flow|timeout|seal|archive|expiry)$/ }),
+    ).toHaveCount(0);
   });
 
   test("报表与审计页对管理员可见且有数据", async ({ browser }) => {

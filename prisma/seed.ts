@@ -4,6 +4,7 @@ import type { Prisma } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/server/auth/password";
 import { prisma } from "../src/server/db/client";
 import { contractFieldArraySchema } from "../src/shared/contract-fields";
+import { seedDemoWorld } from "./seed-demo";
 import {
   PERMISSION_DEFINITIONS,
   PERMISSION_KEYS,
@@ -300,6 +301,7 @@ async function main(): Promise<void> {
   await seedRoles();
   const admin = await seedAdmin();
   await seedMasterData(admin.id);
+  await seedDemoWorld(admin.id);
 }
 
 main()

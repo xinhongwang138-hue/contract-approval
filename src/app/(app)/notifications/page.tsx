@@ -19,6 +19,10 @@ const KIND_LABELS: Record<string, string> = {
   cc: "抄送",
   flow: "流程",
   timeout: "超时",
+  // 以下三种同样由 notifyUsers() 写入，缺了就会把英文原文漏到徽标上
+  seal: "用印", // lifecycle.ts 取件 / 归还
+  archive: "归档", // lifecycle.ts 归档完成
+  expiry: "到期", // lifecycle.ts 已到期 / 即将到期
 };
 
 export default async function NotificationsPage({

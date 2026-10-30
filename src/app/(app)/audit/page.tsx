@@ -13,6 +13,14 @@ import {
   listFlowEvents,
 } from "@/server/services/audit-log";
 import { formatDateTime, parseShanghaiDate } from "@/shared/datetime";
+import { FLOW_STATE_LABELS } from "@/shared/flow-definition";
+
+function stateLabel(value: string | null): string {
+  if (value === null) {
+    return "—";
+  }
+  return FLOW_STATE_LABELS[value] ?? value;
+}
 
 export const metadata = { title: "审计日志" };
 
@@ -107,7 +115,7 @@ export default async function AuditPage({
           action: row.action,
           objectLabel: `${row.contractNo} · ${row.contractTitle}`,
           objectHref: `/approvals/${row.instanceId}`,
-          change: `${row.from ?? "—"} → ${row.to ?? "—"}　${row.detail}`,
+          change: `${stateLabel(row.from)} → ${stateLabel(row.to)}　${row.detail}`,
           source: "",
           ua: "",
         }));
@@ -256,7 +264,9 @@ export default async function AuditPage({
                     <th className="py-2 text-left font-medium">动作</th>
                     <th className="py-2 text-left font-medium">对象</th>
                     <th className="py-2 text-left font-medium">变化</th>
-                    <th className="py-2 text-left font-medium">来源</th>
+                    {tab === "audit" ? (
+                      <th className="py-2 text-left font-medium">来源</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -281,10 +291,12 @@ export default async function AuditPage({
                       <td className="max-w-96 py-2 text-xs">
                         <p className="truncate text-muted-foreground">{row.change}</p>
                       </td>
-                      <td className="max-w-48 py-2 text-xs text-muted-foreground">
-                        <p className="truncate">{row.source || "—"}</p>
-                        <p className="truncate">{row.ua}</p>
-                      </td>
+                      {tab === "audit" ? (
+                        <td className="max-w-48 py-2 text-xs text-muted-foreground">
+                          <p className="truncate">{row.source || "—"}</p>
+                          <p className="truncate">{row.ua}</p>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
