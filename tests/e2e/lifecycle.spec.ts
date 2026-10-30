@@ -389,7 +389,7 @@ test.describe("用印与归档", () => {
     ).toBeVisible({ timeout: 30_000 });
 
     const lihua = await openContext(browser, "lihua@example.com", "User@12345");
-    // 先等「待办明细」这张卡渲染出来（page.tsx:124），再断言看不到。
+    // 先等「待办明细」这张卡渲染出来（page.tsx:161），再断言看不到。
     // 否则页面还没到，"看不到" 一开始就成立 —— 这类负向断言会变成永远为真的空断言。
     await expect(lihua.getByText("待办明细")).toBeVisible({ timeout: 30_000 });
     await expect(lihua.getByRole("link", { name: /HT-PURCHASE-202610-9002/ })).toHaveCount(0);

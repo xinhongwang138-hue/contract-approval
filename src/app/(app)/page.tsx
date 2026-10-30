@@ -19,10 +19,40 @@ import { formatMoney } from "@/shared/money";
 import { contractStatusLabel } from "@/shared/contract-status";
 import { getAccessContext } from "@/server/auth/access";
 import { requirePageAuth } from "@/server/auth/session";
-import { getWorkbench } from "@/server/services/approval";
+import {
+  getWorkbench,
+  type ApprovalTodoItem,
+} from "@/server/services/approval";
 import { countUnreadNotifications } from "@/server/services/notification";
 
 export const metadata = { title: "工作台" };
+
+// 左段标题可截断，中段节点/金额，右段截止时间靠右；窄屏按段堆叠。
+function TodoRow({ item }: { item: ApprovalTodoItem }) {
+  return (
+    <Link
+      href={`/approvals/${item.instanceId}`}
+      className="grid gap-x-4 gap-y-1 py-3 hover:bg-muted/50 sm:grid-cols-[minmax(0,1fr)_auto_10rem] sm:items-center"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{item.title}</p>
+        <p className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs text-muted-foreground">
+            {item.contractNo}
+          </span>
+          {item.delegated ? <Badge variant="outline">受托代办</Badge> : null}
+          {item.overdue ? <Badge variant="destructive">已超期</Badge> : null}
+        </p>
+      </div>
+      <p className="text-xs tabular-nums text-muted-foreground sm:text-right">
+        {item.nodeName} · {formatMoney(item.amount, item.currency)}
+      </p>
+      <p className="text-xs text-muted-foreground sm:whitespace-nowrap sm:text-right">
+        {item.dueAt ? `截止 ${formatDateTime(item.dueAt)}` : "未设截止时间"}
+      </p>
+    </Link>
+  );
+}
 
 export default async function WorkbenchPage() {
   const { user } = await requirePageAuth();
@@ -144,25 +174,7 @@ export default async function WorkbenchPage() {
             <ul className="divide-y">
               {workbench.pending.map((item) => (
                 <li key={item.taskId}>
-                  <Link
-                    href={`/approvals/${item.instanceId}`}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 hover:bg-muted/50"
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {item.contractNo}
-                    </span>
-                    <span className="flex-1 text-sm font-medium">{item.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.nodeName} · {formatMoney(item.amount, item.currency)}
-                    </span>
-                    {item.delegated ? <Badge variant="outline">受托代办</Badge> : null}
-                    {item.overdue ? <Badge variant="destructive">已超期</Badge> : null}
-                    {item.dueAt ? (
-                      <span className="text-xs text-muted-foreground">
-                        截止 {formatDateTime(item.dueAt)}
-                      </span>
-                    ) : null}
-                  </Link>
+                  <TodoRow item={item} />
                 </li>
               ))}
             </ul>
@@ -258,19 +270,7 @@ export default async function WorkbenchPage() {
             <ul className="divide-y">
               {workbench.overdue.map((item) => (
                 <li key={item.taskId}>
-                  <Link
-                    href={`/approvals/${item.instanceId}`}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 hover:bg-muted/50"
-                  >
-                    <Badge variant="destructive">超期</Badge>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {item.contractNo}
-                    </span>
-                    <span className="flex-1 text-sm font-medium">{item.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.nodeName} · 截止 {formatDateTime(item.dueAt ?? item.createdAt)}
-                    </span>
-                  </Link>
+                  <TodoRow item={item} />
                 </li>
               ))}
             </ul>
