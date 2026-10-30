@@ -327,7 +327,25 @@ test.describe("用印与归档", () => {
   test("列表分页翻页保留筛选参数", async ({ browser }) => {
     const admin = await openContext(browser, ADMIN_EMAIL, ADMIN_PASSWORD);
 
-    // 用 pageSize=1 让现有数据产生多页，不依赖造数
+    // 分页控件只在 totalPages > 1 时渲染（archive-manager.tsx:190），
+    // 所以不能假设「库里本来就有很多条」。先把待归档那条归档掉，
+    // 让「已归档」至少 2 条 —— 这样 pageSize=1 才真的产生两页。
+    await admin.goto("/archive");
+    const pendingArchive = admin
+      .getByRole("row")
+      .filter({ has: admin.getByRole("button", { name: "归档" }) })
+      .first();
+    if ((await pendingArchive.count()) > 0) {
+      await pendingArchive.getByRole("button", { name: "归档" }).click();
+      const setupDialog = admin.getByRole("dialog");
+      await setupDialog
+        .getByLabel(/归档备注/)
+        .fill("分页用例铺垫：归档后使已归档达到两页");
+      await setupDialog.getByRole("button", { name: "确认归档" }).click();
+      await expect(admin.getByText("合同已归档")).toBeVisible({ timeout: 30_000 });
+    }
+
+    // 用印列表同理，用 pageSize=1 让现有数据产生多页
     await admin.goto("/seals?pageSize=1");
     await expect(admin.getByRole("heading", { name: "用印管理" })).toBeVisible();
     await expect(admin.getByText(/第 1 \/ \d+ 页/)).toBeVisible({ timeout: 30_000 });
@@ -345,5 +363,58 @@ test.describe("用印与归档", () => {
     await expect(admin).toHaveURL(/[?&]page=2(&|$)/);
     await expect(admin).toHaveURL(/tab=archived/);
     await expect(admin).toHaveURL(/pageSize=1/);
+  });
+
+  test("种子流程按金额分支：68 万落法务与总经理，小额只落部门主管", async ({ browser }) => {
+    const suffix = uniqueSuffix();
+    const smallTitle = `E2E小额分支${suffix}`;
+
+    // 前面的用例会把自己建的流程绑到 PURCHASE 上，这里先指回种子的分支流程
+    const admin = await openContext(browser, ADMIN_EMAIL, ADMIN_PASSWORD);
+    await admin.goto("/admin/templates");
+    const templateRow = admin
+      .getByRole("row", { name: /采购合同/ })
+      .filter({ hasText: "PURCHASE" });
+    await templateRow.getByRole("button", { name: "编辑" }).click();
+    const bindDialog = admin.getByRole("dialog");
+    await bindDialog.getByLabel("关联审批流").click();
+    await admin.getByRole("option", { name: /采购合同标准流程/ }).click();
+    await bindDialog.getByRole("button", { name: "保存" }).click();
+    await expect(admin.getByText("模板已更新")).toBeVisible();
+
+    // 大额：待办在法务手上，部门主管看不到
+    const wangfang = await openContext(browser, "wangfang@example.com", "User@12345");
+    await expect(
+      wangfang.getByRole("link", { name: /HT-PURCHASE-202610-9002/ }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+
+    const lihua = await openContext(browser, "lihua@example.com", "User@12345");
+    // 先等「待办明细」这张卡渲染出来（page.tsx:124），再断言看不到。
+    // 否则页面还没到，"看不到" 一开始就成立 —— 这类负向断言会变成永远为真的空断言。
+    await expect(lihua.getByText("待办明细")).toBeVisible({ timeout: 30_000 });
+    await expect(lihua.getByRole("link", { name: /HT-PURCHASE-202610-9002/ })).toHaveCount(0);
+
+    // 小额 18 万：预览只应有部门主管，不该出现法务审核与总经理审批
+    const chenchen = await openContext(browser, "chenchen@example.com", "User@12345");
+    await createDraftContract(chenchen, smallTitle);
+    await chenchen.getByRole("button", { name: "提交审批" }).click();
+    const submitDialog = chenchen.getByRole("dialog");
+    await expect(submitDialog.getByText("部门主管审批").first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(submitDialog.getByText("法务审核")).toHaveCount(0);
+    await expect(submitDialog.getByText("总经理审批")).toHaveCount(0);
+    await submitDialog.getByRole("button", { name: "确认提交" }).click();
+    await expect(chenchen.getByText("已提交审批")).toBeVisible({ timeout: 30_000 });
+
+    await lihua.reload();
+    await expect(
+      lihua.getByRole("link", { name: new RegExp(smallTitle) }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+
+    await admin.close();
+    await wangfang.close();
+    await chenchen.close();
+    await lihua.close();
   });
 });

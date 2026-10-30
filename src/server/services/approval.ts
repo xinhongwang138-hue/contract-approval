@@ -5,10 +5,13 @@ import { recordAudit } from "@/server/audit";
 import { prisma } from "@/server/db/client";
 import { resolveAssignees } from "@/server/flow/assignee";
 import { runWithFlowRetry, startFlowInstance } from "@/server/flow/engine";
+import { resolveBranch, type ExpressionRoots } from "@/server/flow/expression";
 import { validateFlowDefinition } from "@/server/flow/validate";
 import {
   flowDefinitionSchema,
+  nextTargets,
   type FlowDefinition,
+  type FlowNode,
   type FlowNodeType,
 } from "@/shared/flow-definition";
 import { AppError, ERROR_CODES, ValidationError } from "@/shared/errors";
@@ -219,6 +222,43 @@ async function loadActiveFlow(contract: {
   };
 }
 
+/**
+ * 沿引擎会走的路径遍历节点：条件节点只进入命中的分支（定义校验保证必有默认分支），
+ * 并行 fork 进入全部分支。直接列 definition.nodes 会把没走到的分支也显示出来。
+ */
+function pathNodes(definition: FlowDefinition, roots: ExpressionRoots): FlowNode[] {
+  const index = new Map(definition.nodes.map((node) => [node.id, node]));
+  const visited = new Set<string>();
+  const nodes: FlowNode[] = [];
+
+  const walk = (id: string | undefined): void => {
+    const node = id === undefined ? undefined : index.get(id);
+    if (!node || visited.has(node.id)) {
+      return;
+    }
+    visited.add(node.id);
+    nodes.push(node);
+    if (node.type === "end") {
+      return;
+    }
+    if (node.type === "condition") {
+      const branch = resolveBranch(node.branches, roots);
+      if (branch !== null) {
+        for (const target of nextTargets(branch.next)) {
+          walk(target);
+        }
+      }
+      return;
+    }
+    for (const target of nextTargets(node.next)) {
+      walk(target);
+    }
+  };
+
+  walk(definition.entry);
+  return nodes;
+}
+
 async function buildPreview(
   contract: NonNullable<Awaited<ReturnType<typeof loadContract>>>,
   flow: Awaited<ReturnType<typeof loadActiveFlow>>,
@@ -243,7 +283,7 @@ async function buildPreview(
     }
   }
 
-  for (const node of flow.definition.nodes) {
+  for (const node of pathNodes(flow.definition, context)) {
     if (node.type !== "approval" && node.type !== "cc") {
       continue;
     }

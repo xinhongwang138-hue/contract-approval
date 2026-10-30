@@ -159,6 +159,167 @@ describe("contract submission", () => {
     expect(await prisma.flowInstance.count()).toBe(0);
   });
 
+  it("previews only the branch the amount actually takes", async () => {
+    const access = await getAccessContext(world.initiatorId);
+    const bigRole = `flow_branch_big_${world.suffix.toLowerCase()}`;
+    const smallRole = `flow_branch_small_${world.suffix.toLowerCase()}`;
+    for (const [key, name] of [
+      [bigRole, "大额分支角色"],
+      [smallRole, "小额分支角色"],
+    ] as const) {
+      await prisma.role.create({ data: { key, name } });
+    }
+    const big = await prisma.role.findUniqueOrThrow({ where: { key: bigRole } });
+    const small = await prisma.role.findUniqueOrThrow({ where: { key: smallRole } });
+    await prisma.userRole.create({
+      data: { userId: world.approverIds[0]!, roleId: big.id },
+    });
+    await prisma.userRole.create({
+      data: { userId: world.approverIds[1]!, roleId: small.id },
+    });
+
+    const definition = {
+      schemaVersion: 1,
+      entry: "start",
+      nodes: [
+        { id: "start", type: "start", name: "发起", next: "amount" },
+        {
+          id: "amount",
+          type: "condition",
+          name: "金额分流",
+          branches: [
+            {
+              id: "big",
+              name: "50 万以上",
+              when: { left: "contract.amount", op: "gte", right: 500000 },
+              next: "legal",
+            },
+            { id: "small", name: "50 万以下", when: null, next: "dept" },
+          ],
+        },
+        {
+          id: "legal",
+          type: "approval",
+          name: "法务审核",
+          assignee: { kind: "role", key: bigRole },
+          mode: "any",
+          next: "ceo",
+        },
+        {
+          id: "ceo",
+          type: "approval",
+          name: "总经理审批",
+          assignee: { kind: "role", key: bigRole },
+          mode: "all",
+          next: "end",
+        },
+        {
+          id: "dept",
+          type: "approval",
+          name: "部门主管审批",
+          assignee: { kind: "role", key: smallRole },
+          mode: "any",
+          next: "end",
+        },
+        { id: "end", type: "end", name: "结束", result: "approved" },
+      ],
+    };
+    const flowId = await publishFlow(definition);
+    await setTemplateFlow(world.templateId, flowId, world.initiatorId);
+
+    const smallContractId = await world.createContract({ amount: "180000.00" });
+    const { preview: smallPreview } = await previewContractFlow(access, smallContractId);
+    expect(smallPreview.blocking).toEqual([]);
+    expect(smallPreview.nodes.map((node) => node.name)).toEqual(["部门主管审批"]);
+
+    const bigContractId = await world.createContract({ amount: "680000.00" });
+    const { preview: bigPreview } = await previewContractFlow(access, bigContractId);
+    expect(bigPreview.blocking).toEqual([]);
+    expect(bigPreview.nodes.map((node) => node.name)).toEqual([
+      "法务审核",
+      "总经理审批",
+    ]);
+
+    const started = await submitContract(access, smallContractId);
+    const tasks = await prisma.flowTask.findMany({
+      where: { instanceId: started.instanceId },
+    });
+    expect(tasks).toHaveLength(1);
+    const nodeRun = await prisma.flowNodeRun.findUniqueOrThrow({
+      where: { id: tasks[0]!.nodeRunId },
+      select: { nodeId: true },
+    });
+    expect(nodeRun.nodeId).toBe("dept");
+  });
+
+  it("previews every branch of a parallel fork after the condition", async () => {
+    const access = await getAccessContext(world.initiatorId);
+    const roleKey = `flow_branch_fork_${world.suffix.toLowerCase()}`;
+    await prisma.role.create({ data: { key: roleKey, name: "并行分支角色" } });
+    const role = await prisma.role.findUniqueOrThrow({ where: { key: roleKey } });
+    await prisma.userRole.create({
+      data: { userId: world.approverIds[0]!, roleId: role.id },
+    });
+
+    const flowId = await publishFlow({
+      schemaVersion: 1,
+      entry: "start",
+      nodes: [
+        { id: "start", type: "start", name: "发起", next: "amount" },
+        {
+          id: "amount",
+          type: "condition",
+          name: "金额分流",
+          branches: [
+            {
+              id: "big",
+              name: "50 万以上并行会签",
+              when: { left: "contract.amount", op: "gte", right: 500000 },
+              next: ["legal", "finance"],
+            },
+            { id: "small", name: "50 万以下", when: null, next: "dept" },
+          ],
+        },
+        {
+          id: "legal",
+          type: "approval",
+          name: "法务审核",
+          assignee: { kind: "role", key: roleKey },
+          mode: "any",
+          next: "merge",
+        },
+        {
+          id: "finance",
+          type: "approval",
+          name: "财务审核",
+          assignee: { kind: "role", key: roleKey },
+          mode: "any",
+          next: "merge",
+        },
+        { id: "merge", type: "join", name: "并行汇聚", next: "end" },
+        {
+          id: "dept",
+          type: "approval",
+          name: "部门主管审批",
+          assignee: { kind: "role", key: roleKey },
+          mode: "any",
+          next: "end",
+        },
+        { id: "end", type: "end", name: "结束", result: "approved" },
+      ],
+    });
+    await setTemplateFlow(world.templateId, flowId, world.initiatorId);
+
+    const bigContractId = await world.createContract({ amount: "680000.00" });
+    const { preview } = await previewContractFlow(access, bigContractId);
+    expect(preview.blocking).toEqual([]);
+    expect(preview.nodes.map((node) => node.name)).toEqual(["法务审核", "财务审核"]);
+
+    const smallContractId = await world.createContract({ amount: "180000.00" });
+    const { preview: smallPreview } = await previewContractFlow(access, smallContractId);
+    expect(smallPreview.nodes.map((node) => node.name)).toEqual(["部门主管审批"]);
+  });
+
   it("lets the initiator resubmit a rejected contract as a new instance", async () => {
     const access = await getAccessContext(world.initiatorId);
     const contractId = await world.createContract();
