@@ -459,7 +459,7 @@ export type Workbench = {
   counts: { pending: number; overdue: number; initiated: number; cc: number };
 };
 
-const TODO_INCLUDE = {
+const WORKBENCH_TASK_INCLUDE = {
   instance: {
     select: {
       id: true,
@@ -479,9 +479,9 @@ const TODO_INCLUDE = {
   assignee: { select: { id: true, name: true } },
 } satisfies Prisma.FlowTaskInclude;
 
-type TodoRow = Prisma.FlowTaskGetPayload<{ include: typeof TODO_INCLUDE }>;
+type WorkbenchTaskRow = Prisma.FlowTaskGetPayload<{ include: typeof WORKBENCH_TASK_INCLUDE }>;
 
-function toTodoItem(row: TodoRow, delegated: boolean, now: Date): ApprovalTodoItem {
+function toTodoItem(row: WorkbenchTaskRow, delegated: boolean, now: Date): ApprovalTodoItem {
   const contract = row.instance.contract;
   return {
     taskId: row.id,
@@ -524,13 +524,13 @@ export async function getWorkbench(
   const [pendingRows, overdueRows, pendingTotal, overdueTotal] = await Promise.all([
     prisma.flowTask.findMany({
       where: taskWhere(false),
-      include: TODO_INCLUDE,
+      include: WORKBENCH_TASK_INCLUDE,
       orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
       take: 10,
     }),
     prisma.flowTask.findMany({
       where: taskWhere(true),
-      include: TODO_INCLUDE,
+      include: WORKBENCH_TASK_INCLUDE,
       orderBy: { dueAt: "asc" },
       take: 10,
     }),
