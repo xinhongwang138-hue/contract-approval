@@ -89,18 +89,28 @@ export default async function EfficiencyReportPage({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-3 text-sm">
-          {REPORT_WINDOWS.map((days) => (
-            <Link
-              key={days}
-              href={buildHref({ days: String(days) })}
-              className={
-                days === windowDays ? "font-medium text-primary" : "text-muted-foreground"
-              }
-            >
-              近 {days} 天
-            </Link>
-          ))}
+        <div
+          role="group"
+          aria-label="统计时间窗口"
+          className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1 text-sm"
+        >
+          {REPORT_WINDOWS.map((days) => {
+            const active = days === windowDays;
+            return (
+              <Link
+                key={days}
+                href={buildHref({ days: String(days) })}
+                aria-current={active ? "page" : undefined}
+                className={
+                  active
+                    ? "rounded-md bg-background px-3 py-1 font-medium text-foreground shadow-xs"
+                    : "rounded-md px-3 py-1 text-muted-foreground hover:text-foreground"
+                }
+              >
+                近 {days} 天
+              </Link>
+            );
+          })}
         </div>
 
         <form action="/reports/efficiency" className="flex items-center gap-2">

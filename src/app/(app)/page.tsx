@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime } from "@/shared/datetime";
 import { formatMoney } from "@/shared/money";
 import { contractStatusLabel } from "@/shared/contract-status";
@@ -95,6 +96,12 @@ export default async function WorkbenchPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
+          const tone =
+            card.value === 0
+              ? "text-muted-foreground/70"
+              : card.key === "overdue"
+                ? "text-destructive"
+                : "text-foreground";
           return (
             <Link key={card.key} href={card.href} className="group">
               <Card className="transition-colors group-hover:border-foreground/20">
@@ -102,10 +109,10 @@ export default async function WorkbenchPage() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {card.label}
                   </CardTitle>
-                  <Icon className="size-4 text-muted-foreground" />
+                  <Icon className={cn("size-4", tone)} />
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-semibold tabular-nums">
+                  <p className={cn("text-3xl font-semibold tabular-nums", tone)}>
                     {card.value}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
