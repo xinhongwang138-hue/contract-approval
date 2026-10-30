@@ -17,6 +17,7 @@ import {
   type TaskStatus,
 } from "@/shared/state-machines";
 import { AppError, ERROR_CODES, ValidationError } from "@/shared/errors";
+import { claimOnce } from "./idempotency";
 import { resolveAssignees } from "./assignee";
 import { resolveBranch } from "./expression";
 import { createWebhookDispatcher } from "./webhook";
@@ -1761,21 +1762,14 @@ export async function processDueTasks(
     }
 
     const action = node.timeout.action;
-    const key = `timeout:${action}:${task.id}:${task.dueAt?.toISOString() ?? "none"}`;
-    try {
-      await db.idempotencyKey.create({
-        data: {
-          key,
-          scope: "flow_timeout",
-          response: { taskId: task.id, action } as Prisma.InputJsonValue,
-        },
-      });
-    } catch (error) {
-      if ((error as { code?: string }).code === "P2002") {
-        skipped += 1;
-        continue;
-      }
-      throw error;
+    const claimed = await claimOnce(db, {
+      key: `timeout:${action}:${task.id}:${task.dueAt?.toISOString() ?? "none"}`,
+      scope: "flow_timeout",
+      response: { taskId: task.id, action },
+    });
+    if (!claimed) {
+      skipped += 1;
+      continue;
     }
 
     if (action === "remind") {

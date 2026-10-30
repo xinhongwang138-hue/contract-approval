@@ -15,12 +15,19 @@ import {
   getContractDetail,
 } from "@/server/services/contract";
 import { previewContractFlow, type FlowPreview } from "@/server/services/approval";
+import { getContractLifecycle } from "@/server/services/lifecycle";
 import { formatDate, formatDateTime } from "@/shared/datetime";
 import { AppError, ERROR_CODES } from "@/shared/errors";
 import { formatMoney } from "@/shared/money";
 import { ATTACHMENT_KIND_LABELS } from "@/shared/schemas/attachment";
 import type { AttachmentKind } from "@/shared/schemas/attachment";
 import { CONTRACT_STAGE_LABELS, isEditableContractStatus } from "@/shared/contract-status";
+import {
+  MILESTONE_KIND_LABELS,
+  SEAL_STATE_LABELS,
+  SEAL_TYPE_LABELS,
+  type SealType,
+} from "@/shared/lifecycle";
 
 export const metadata = { title: "合同详情" };
 
@@ -62,6 +69,7 @@ export default async function ContractDetailPage({
   }
 
   const similar = await findSimilarContracts(access, detail.id);
+  const lifecycle = await getContractLifecycle(detail.id);
 
   let preview: FlowPreview | null = null;
   let previewError: string | null = null;
@@ -251,6 +259,50 @@ export default async function ContractDetailPage({
               </div>
             ) : null}
           </section>
+
+          {lifecycle.sealRecords.length > 0 || lifecycle.milestones.length > 0 ? (
+            <section className="rounded-lg border bg-card p-4 shadow-xs">
+              <h2 className="mb-3 text-sm font-semibold">用印与生命周期</h2>
+
+              {lifecycle.sealRecords.length > 0 ? (
+                <ul className="divide-y">
+                  {lifecycle.sealRecords.map((record) => (
+                    <li key={record.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
+                      <span className="font-medium">{SEAL_TYPE_LABELS[record.sealType as SealType]}</span>
+                      <span className="text-xs text-muted-foreground">{record.copies} 份 · {record.applicantName}</span>
+                      <Badge variant={record.state === "returned" ? "outline" : "secondary"}>
+                        {SEAL_STATE_LABELS[record.state]}
+                      </Badge>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        申请 {formatDateTime(record.appliedAt)}
+                        {record.pickedAt ? ` · 取件 ${formatDateTime(record.pickedAt)}` : ""}
+                        {record.returnedAt ? ` · 归还 ${formatDateTime(record.returnedAt)}` : ""}
+                        {record.notaryNo ? ` · 编号 ${record.notaryNo}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              {lifecycle.milestones.length > 0 ? (
+                <ol className={lifecycle.sealRecords.length > 0 ? "mt-3 space-y-1 border-t pt-3" : "space-y-1"}>
+                  {lifecycle.milestones.map((milestone) => (
+                    <li key={`${milestone.kind}-${milestone.at.toISOString()}`} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="size-1.5 rounded-full bg-primary" />
+                      <span className="font-medium">{MILESTONE_KIND_LABELS[milestone.kind] ?? milestone.kind}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDateTime(milestone.at)}
+                        {milestone.operatorName ? ` · ${milestone.operatorName}` : ""}
+                      </span>
+                      {milestone.note ? (
+                        <span className="text-xs text-muted-foreground">— {milestone.note}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+            </section>
+          ) : null}
         </div>
 
         <div className="space-y-6">

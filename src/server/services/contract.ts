@@ -14,6 +14,7 @@ import { Decimal, toDecimal } from "@/shared/money";
 import type {
   ContractDraftInput,
   ContractListQuery,
+  ContractSortField,
   ContractUpdateInput,
 } from "@/shared/schemas/contract";
 import type { ContractStatus } from "@/shared/state-machines";
@@ -211,12 +212,13 @@ async function getScopedContract(
   return contract;
 }
 
-export async function listContracts(
+/**
+ * 列表与导出共用同一套过滤与排序，避免「导出的行数和屏幕上看到的不一样」。
+ */
+export async function buildContractListWhere(
   access: AccessContext,
-  query: ContractListQuery,
-): Promise<ContractListResult> {
-  requireContractPermission(access, "contract.read");
-
+  query: { q?: string; status?: ContractStatus },
+): Promise<Prisma.ContractWhereInput> {
   const scope = await buildContractScope(access);
   const conditions: Prisma.ContractWhereInput[] = [scope];
 
@@ -235,18 +237,34 @@ export async function listContracts(
     });
   }
 
-  const where: Prisma.ContractWhereInput = { deletedAt: null, AND: conditions };
-  const pageSize = query.pageSize;
-  const orderBy: Prisma.ContractOrderByWithRelationInput[] = [
-    query.sort === "amount"
-      ? { amount: query.order }
-      : query.sort === "createdAt"
-        ? { createdAt: query.order }
-        : query.sort === "endDate"
-          ? { endDate: query.order }
-          : { updatedAt: query.order },
+  return { deletedAt: null, AND: conditions };
+}
+
+export function buildContractListOrderBy(
+  sort: ContractSortField,
+  order: "asc" | "desc",
+): Prisma.ContractOrderByWithRelationInput[] {
+  return [
+    sort === "amount"
+      ? { amount: order }
+      : sort === "createdAt"
+        ? { createdAt: order }
+        : sort === "endDate"
+          ? { endDate: order }
+          : { updatedAt: order },
     { id: "asc" },
   ];
+}
+
+export async function listContracts(
+  access: AccessContext,
+  query: ContractListQuery,
+): Promise<ContractListResult> {
+  requireContractPermission(access, "contract.read");
+
+  const where = await buildContractListWhere(access, { q: query.q, status: query.status });
+  const pageSize = query.pageSize;
+  const orderBy = buildContractListOrderBy(query.sort, query.order);
 
   const [total, rows] = await prisma.$transaction([
     prisma.contract.count({ where }),

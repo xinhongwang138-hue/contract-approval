@@ -35,6 +35,8 @@ export default defineConfig([
     "src/generated/**",
     "playwright-report/**",
     "test-results/**",
+    "tests/.tmp/**",
+    ".tmp-*",
     "coverage/**",
     "next-env.d.ts",
   ]),

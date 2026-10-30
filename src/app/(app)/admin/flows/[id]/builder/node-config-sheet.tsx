@@ -28,6 +28,8 @@ import {
   APPROVAL_MODE_LABELS,
   APPROVAL_MODES,
   ASSIGNEE_KINDS,
+  ACTION_KINDS,
+  ACTION_KIND_LABELS,
   EMPTY_APPROVER_POLICIES,
   SELF_APPROVE_POLICIES,
   TIMEOUT_ACTIONS,
@@ -696,13 +698,11 @@ function NodeDraft({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["notify", "set_status", "create_seal_record", "archive", "webhook"].map(
-                      (kind) => (
-                        <SelectItem key={kind} value={kind}>
-                          {kind}
-                        </SelectItem>
-                      ),
-                    )}
+                    {ACTION_KINDS.map((kind) => (
+                      <SelectItem key={kind} value={kind}>
+                        {ACTION_KIND_LABELS[kind]}（{kind}）
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>

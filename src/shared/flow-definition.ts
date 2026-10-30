@@ -120,6 +120,14 @@ export const ACTION_KINDS = [
 ] as const;
 export type ActionKind = (typeof ACTION_KINDS)[number];
 
+export const ACTION_KIND_LABELS: Record<ActionKind, string> = {
+  notify: "发送通知",
+  set_status: "修改合同状态",
+  create_seal_record: "创建用印申请",
+  archive: "归档合同",
+  webhook: "外部回调",
+};
+
 export const END_RESULTS = ["approved", "rejected", "terminated"] as const;
 export type EndResult = (typeof END_RESULTS)[number];
 

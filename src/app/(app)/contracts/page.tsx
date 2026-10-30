@@ -44,6 +44,7 @@ export default async function ContractsPage({
   const result = await listContracts(access, query);
   const canEdit = access.permissions.has("contract.update");
   const canCreate = access.permissions.has("contract.create");
+  const canExport = access.permissions.has("contract.export");
 
   const buildHref = (overrides: Record<string, string | undefined>): string => {
     const params = new URLSearchParams();
@@ -65,6 +66,22 @@ export default async function ContractsPage({
     return qs ? `/contracts?${qs}` : "/contracts";
   };
 
+  const exportHref = (format: "csv" | "xlsx"): string => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries({
+      format,
+      q: query.q,
+      status: query.status,
+      sort: query.sort,
+      order: query.order,
+    })) {
+      if (value) {
+        params.set(key, value);
+      }
+    }
+    return `/api/exports/contracts?${params.toString()}`;
+  };
+
   const sortHref = (field: typeof query.sort): string =>
     buildHref({
       sort: field,
@@ -83,11 +100,23 @@ export default async function ContractsPage({
         title="合同管理"
         description="按权限与数据范围查看合同台账，草稿可继续编辑。"
         actions={
-          canCreate ? (
-            <Button asChild>
-              <Link href="/contracts/new">新建合同</Link>
-            </Button>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            {canExport ? (
+              <>
+                <Button asChild variant="outline">
+                  <Link href={exportHref("csv")}>导出 CSV</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={exportHref("xlsx")}>导出 Excel</Link>
+                </Button>
+              </>
+            ) : null}
+            {canCreate ? (
+              <Button asChild>
+                <Link href="/contracts/new">新建合同</Link>
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

@@ -11,6 +11,8 @@ test-results
 src/generated
 storage
 tests/.tmp
+.tmp-*
+*.wb-bak
 .pw-artifacts
 .pw-run
 *.log

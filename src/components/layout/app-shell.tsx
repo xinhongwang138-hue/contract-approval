@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  Archive,
+  BarChart3,
   Bell,
   Building2,
   FileStack,
@@ -12,7 +14,9 @@ import {
   LogOut,
   Menu,
   Network,
+  ScrollText,
   ShieldCheck,
+  Stamp,
   Users,
   UserCog,
   Workflow,
@@ -48,7 +52,21 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/", label: "工作台", icon: LayoutDashboard },
       { href: "/contracts", label: "合同管理", icon: FileText, permissions: ["contract.read"] },
+      { href: "/seals", label: "用印管理", icon: Stamp, permissions: ["contract.seal"] },
+      { href: "/archive", label: "合同归档", icon: Archive, permissions: ["contract.archive"] },
       { href: "/notifications", label: "消息通知", icon: Bell },
+    ],
+  },
+  {
+    label: "分析",
+    items: [
+      {
+        href: "/reports/efficiency",
+        label: "效率报表",
+        icon: BarChart3,
+        permissions: ["report.read"],
+      },
+      { href: "/audit", label: "审计日志", icon: ScrollText, permissions: ["audit.read"] },
     ],
   },
   {
