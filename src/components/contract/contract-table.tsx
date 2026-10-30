@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/table";
 import { isEditableContractStatus } from "@/shared/contract-status";
 import { formatDate } from "@/shared/datetime";
+import { expiryTone } from "@/shared/lifecycle";
 import { formatMoney } from "@/shared/money";
 import type { ContractSortField } from "@/shared/schemas/contract";
 import type { ContractListItem } from "@/server/services/contract";
+import { cn } from "@/lib/utils";
 import { ContractStatusBadge } from "./status-badge";
 
 export type ContractTableProps = {
@@ -22,7 +24,21 @@ export type ContractTableProps = {
   order: "asc" | "desc";
   sortHref: (field: ContractSortField) => string;
   canEdit: boolean;
+  today: Date;
+  warningDays: readonly number[];
 };
+
+const EXPIRY_TONE_CLASS = {
+  expired: "text-destructive font-medium",
+  urgent: "text-destructive",
+  soon: "text-amber-600",
+} as const;
+
+const EXPIRY_TONE_HINT = {
+  expired: "已过期",
+  urgent: "临近到期",
+  soon: "即将到期",
+} as const;
 
 function SortHeader({
   field,
@@ -60,6 +76,8 @@ export function ContractTable({
   order,
   sortHref,
   canEdit,
+  today,
+  warningDays,
 }: ContractTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border">
@@ -111,7 +129,9 @@ export function ContractTable({
               </TableCell>
             </TableRow>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const tone = expiryTone(item.status, item.endDate, today, warningDays);
+              return (
               <TableRow key={item.id}>
                 <TableCell className="hidden font-mono text-xs break-all sm:table-cell">
                   {item.no}
@@ -147,7 +167,13 @@ export function ContractTable({
                 <TableCell className="hidden md:table-cell">
                   <ContractStatusBadge status={item.status} />
                 </TableCell>
-                <TableCell className="hidden whitespace-nowrap text-sm md:table-cell">
+                <TableCell
+                  className={cn(
+                    "hidden whitespace-nowrap text-sm md:table-cell",
+                    tone ? EXPIRY_TONE_CLASS[tone] : undefined,
+                  )}
+                  title={tone ? EXPIRY_TONE_HINT[tone] : undefined}
+                >
                   {formatDate(item.endDate)}
                 </TableCell>
                 <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground 2xl:table-cell">
@@ -178,7 +204,8 @@ export function ContractTable({
                   </div>
                 </TableCell>
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>

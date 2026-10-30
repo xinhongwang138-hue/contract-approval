@@ -50,3 +50,33 @@ export const ARCHIVABLE_CONTRACT_STATUSES: readonly ContractStatus[] = [
 export function isArchivableContractStatus(status: ContractStatus): boolean {
   return ARCHIVABLE_CONTRACT_STATUSES.includes(status);
 }
+
+/**
+ * 台账里给到期日上色的档位。阈值与到期预警 worker 共用同一个环境变量，
+ * 只对在履行期内的合同生效（草稿、已归档、已终止的合同谈不上"快到期"）。
+ */
+export function expiryTone(
+  status: ContractStatus,
+  endDate: Date,
+  today: Date,
+  warningDays: readonly number[],
+): "expired" | "urgent" | "soon" | null {
+  if (status !== "active" && status !== "amended") {
+    return null;
+  }
+  const thresholds = warningDays.filter((days) => days > 0);
+  if (thresholds.length === 0) {
+    return null;
+  }
+  const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / 86_400_000);
+  if (daysLeft < 0) {
+    return "expired";
+  }
+  if (daysLeft <= Math.min(...thresholds)) {
+    return "urgent";
+  }
+  if (daysLeft <= Math.max(...thresholds)) {
+    return "soon";
+  }
+  return null;
+}

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { getAccessContext } from "@/server/auth/access";
 import { requirePageAuth } from "@/server/auth/session";
 import { listContracts } from "@/server/services/contract";
+import { parseWarningDays } from "@/server/services/lifecycle";
 import { CONTRACT_STATUS_LABELS } from "@/shared/contract-status";
 import { contractListQuerySchema } from "@/shared/schemas/contract";
 import { CONTRACT_STATUSES } from "@/shared/state-machines";
@@ -177,6 +178,8 @@ export default async function ContractsPage({
           order={query.order}
           sortHref={sortHref}
           canEdit={canEdit}
+          today={new Date()}
+          warningDays={parseWarningDays(process.env.CONTRACT_EXPIRY_WARNING_DAYS)}
         />
 
         <div className="flex items-center justify-end gap-2">
