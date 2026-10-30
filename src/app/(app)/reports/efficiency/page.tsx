@@ -3,7 +3,8 @@ import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { getAccessContext } from "@/server/auth/access";
 import { requirePageAuth } from "@/server/auth/session";
 import {
@@ -34,6 +35,36 @@ function formatHours(value: number | null): string {
 
 function formatRate(value: number | null): string {
   return value === null ? "—" : `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * 报表里唯一的可视化：等比条形，宽度按同屏最大值算。
+ * 刻意不引图表库——数据量小、维度少，CSS 条足够，且省掉一整套依赖。
+ */
+function Bar({
+  value,
+  max,
+  tone,
+}: {
+  value: number | null;
+  max: number;
+  tone: "primary" | "destructive";
+}): React.ReactElement | null {
+  if (value === null || max <= 0) {
+    return null;
+  }
+  const percent = Math.max(2, Math.min(100, (value / max) * 100));
+  return (
+    <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted">
+      <span
+        className={cn(
+          "block h-1 rounded-full",
+          tone === "destructive" ? "bg-destructive/70" : "bg-primary/60",
+        )}
+        style={{ width: `${percent}%` }}
+      />
+    </span>
+  );
 }
 
 export default async function EfficiencyReportPage({
@@ -80,6 +111,9 @@ export default async function EfficiencyReportPage({
     { label: "超期率", value: formatRate(report.totals.overdueRate), hint: `超期 ${report.totals.overdueCount} 件` },
     { label: "驳回率", value: formatRate(report.totals.rejectRate), hint: `驳回 ${report.totals.rejectedCount} 件` },
   ];
+
+  const maxTaskCount = Math.max(0, ...report.nodes.map((node) => node.taskCount));
+  const maxMedian = Math.max(0, ...report.nodes.map((node) => node.medianHours ?? 0));
 
   return (
     <div className="space-y-6">
@@ -162,6 +196,9 @@ export default async function EfficiencyReportPage({
       <Card>
         <CardHeader>
           <CardTitle>节点效率</CardTitle>
+          <CardDescription>
+            条形按同屏最大值等比；中位耗时最长的节点标红，用来定位瓶颈环节。
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {report.nodes.length === 0 ? (
@@ -194,11 +231,23 @@ export default async function EfficiencyReportPage({
                         </span>
                       </td>
                       <td className="py-2">{node.nodeName}</td>
-                      <td className="py-2 text-right tabular-nums">{node.taskCount}</td>
+                      <td className="py-2 text-right tabular-nums">
+                        {node.taskCount}
+                        <Bar value={node.taskCount} max={maxTaskCount} tone="primary" />
+                      </td>
                       <td className="py-2 text-right tabular-nums">{node.pendingCount}</td>
                       <td className="py-2 text-right tabular-nums">{formatHours(node.avgHours)}</td>
                       <td className="py-2 text-right tabular-nums">
                         {formatHours(node.medianHours)}
+                        <Bar
+                          value={node.medianHours}
+                          max={maxMedian}
+                          tone={
+                            node.medianHours !== null && node.medianHours === maxMedian
+                              ? "destructive"
+                              : "primary"
+                          }
+                        />
                       </td>
                       <td className="py-2 text-right tabular-nums">
                         {formatHours(node.slowestHours)}
