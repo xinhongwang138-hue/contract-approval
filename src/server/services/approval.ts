@@ -231,6 +231,7 @@ async function loadActiveFlow(contract: {
 /**
  * 沿引擎会走的路径遍历节点：条件节点只进入命中的分支（定义校验保证必有默认分支），
  * 并行 fork 进入全部分支。直接列 definition.nodes 会把没走到的分支也显示出来。
+ * 这里是深度优先，引擎是队列推进，并行分支下的序号只表示「同批待办」，不承诺执行顺序。
  */
 function pathNodes(
   definition: FlowDefinition,
