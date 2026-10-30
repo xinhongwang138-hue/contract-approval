@@ -372,6 +372,45 @@ describe("engine branching, fork and join", () => {
     expect(await tasksOf(instanceId, "boss")).toHaveLength(1);
   });
 
+  it("counts every arrival when parallel branches are decided at the same time", async () => {
+    const contractId = await world.createContract({ amount: "600000.00" });
+    const [a, b] = world.approverIds;
+    const { instanceId } = await start(contractId, definition([
+      { id: "start", type: "start", name: "发起", next: ["legal", "finance"] },
+      approval("legal", [a!], "merge"),
+      approval("finance", [b!], "merge"),
+      { id: "merge", type: "join", name: "汇聚", next: "boss" },
+      approval("boss", [world.bossId], "end"),
+      { id: "end", type: "end", name: "结束", result: "approved" },
+    ]));
+
+    const legalTask = firstOf(await tasksOf(instanceId, "legal"));
+    const financeTask = firstOf(await tasksOf(instanceId, "finance"));
+
+    const results = await Promise.allSettled(
+      [
+        { taskId: legalTask.id, actorId: a! },
+        { taskId: financeTask.id, actorId: b! },
+      ].map((input) =>
+        runWithFlowRetry(
+          (fn) => prisma.$transaction(fn),
+          (tx) => decideTask(tx, { ...input, action: "approve" }),
+        ),
+      ),
+    );
+    expect(results.map((result) => result.status)).toEqual(["fulfilled", "fulfilled"]);
+
+    // 汇聚计数是读-改-写，靠实例版本锁串行化；丢一次累加就会永远停在 waiting_join
+    const joins = await prisma.flowNodeRun.findMany({
+      where: { instanceId, nodeId: "merge" },
+    });
+    expect(joins).toHaveLength(1);
+    expect(joins[0]?.joinedCount).toBe(2);
+    expect(joins[0]?.status).toBe("approved");
+    expect(await prisma.flowEventLog.count({ where: { instanceId, action: "node.joined" } })).toBe(1);
+    expect(await tasksOf(instanceId, "boss")).toHaveLength(1);
+  });
+
   it("cancels the in-flight sibling branch when one branch rejects", async () => {
     const contractId = await world.createContract({ amount: "600000.00" });
     const [a, b] = world.approverIds;
