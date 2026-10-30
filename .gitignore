@@ -13,6 +13,7 @@ storage
 tests/.tmp
 .tmp-*
 *.wb-bak
+HANDOFF-workbuddy.md
 .pw-artifacts
 .pw-run
 *.log
