@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { DataScopeType } from "@/generated/prisma/enums";
+import { recordAudit } from "@/server/audit";
 import { AppError, ERROR_CODES } from "@/shared/errors";
 import {
   PERMISSION_KEYS,
@@ -86,6 +87,14 @@ export async function requirePermission(
 ): Promise<AccessContext> {
   const access = await getAccessContext(userId);
   if (!access.permissions.has(key)) {
+    // 只记已登录的越权尝试；未登录探测走 401，不写这张不可删改的表
+    await recordAudit(prisma, {
+      actorId: userId,
+      action: "access.denied",
+      entity: "Permission",
+      entityId: key,
+      after: { key },
+    });
     throw new AppError(ERROR_CODES.FORBIDDEN, "没有执行该操作的权限");
   }
   return access;
@@ -205,6 +214,13 @@ export async function requireContractAccess(
   });
 
   if (inScope === 0) {
+    await recordAudit(prisma, {
+      actorId: userId,
+      action: "access.denied",
+      entity: "Contract",
+      entityId: contractId,
+      after: { action },
+    });
     throw new AppError(ERROR_CODES.FORBIDDEN, "无权访问该合同");
   }
 
