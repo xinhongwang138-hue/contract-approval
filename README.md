@@ -36,7 +36,8 @@ npm run dev                   # http://127.0.0.1:3000
 
 ```bash
 npm run db:migrate   # prisma migrate dev
-npm run db:seed      # 主数据 + 演示数据（幂等，可反复跑）
+npm run db:reset     # 丢库重放迁移；种子配在 prisma.config.ts 里，reset 不会自动跑
+npm run db:seed      # 主数据 + 演示数据（幂等，可反复跑）；reset 之后必须补这一条
 npm run test         # Vitest 单测 + 集成
 npm run test:e2e     # Playwright（自动起 :3100 dev server）
 npm run worker       # 审批超时 + 合同到期预警轮询
@@ -87,6 +88,8 @@ npm run worker       # 审批超时 + 合同到期预警轮询
 合同六份覆盖各状态：草稿、审批中、待用印、履行中（有用印记录与里程碑）、已驳回、已归档（抄送王芳）。
 「审批中」那份金额 68 万，走的是大额分支，所以待办在**王芳（法务）**手上，同意后轮到系统管理员（总经理）；
 想看小额分支，把那份 8.8 万的草稿（陈晨发起）直接提交即可，它会落到**李华（部门主管）**。
+跑过 `npm run test:e2e` 之后这份库会被用例改写（模板换绑、多出草稿），要恢复演示口径就
+`npm run db:reset && npm run db:seed`。
 
 ---
 
