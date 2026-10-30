@@ -9,7 +9,7 @@ test-results
 .env.local
 .env.*.local
 src/generated
-storage
+/storage
 tests/.tmp
 .tmp-*
 *.wb-bak
