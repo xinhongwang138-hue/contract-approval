@@ -63,6 +63,14 @@ export function SubmitContractPanel({
                 ? `流程「${preview.flowName}」v${preview.version}（${preview.flowCode}），提交后按此链路生成待办。`
                 : "无法解析该合同模板关联的审批流。"}
             </DialogDescription>
+            {preview && preview.branches.length > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                命中分支：
+                {preview.branches
+                  .map((branch) => `${branch.conditionName} → ${branch.branchName}`)
+                  .join("；")}
+              </p>
+            ) : null}
           </DialogHeader>
 
           {error ? (

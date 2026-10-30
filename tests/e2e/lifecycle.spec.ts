@@ -402,6 +402,8 @@ test.describe("用印与归档", () => {
     await expect(submitDialog.getByText("部门主管审批").first()).toBeVisible({
       timeout: 30_000,
     });
+    // 预览头部要说明走的是哪条分支，否则「只列一支」看起来像漏了节点
+    await expect(submitDialog.getByText(/命中分支：金额分流/)).toBeVisible();
     await expect(submitDialog.getByText("法务审核")).toHaveCount(0);
     await expect(submitDialog.getByText("总经理审批")).toHaveCount(0);
     await submitDialog.getByRole("button", { name: "确认提交" }).click();

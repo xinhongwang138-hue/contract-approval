@@ -29,12 +29,18 @@ export type FlowPreviewNode = {
   messages: string[];
 };
 
+export type FlowPreviewBranch = {
+  conditionName: string;
+  branchName: string;
+};
+
 export type FlowPreview = {
   flowId: string;
   flowName: string;
   flowCode: string;
   version: number;
   nodes: FlowPreviewNode[];
+  branches: FlowPreviewBranch[];
   blocking: string[];
   warnings: string[];
 };
@@ -226,10 +232,14 @@ async function loadActiveFlow(contract: {
  * 沿引擎会走的路径遍历节点：条件节点只进入命中的分支（定义校验保证必有默认分支），
  * 并行 fork 进入全部分支。直接列 definition.nodes 会把没走到的分支也显示出来。
  */
-function pathNodes(definition: FlowDefinition, roots: ExpressionRoots): FlowNode[] {
+function pathNodes(
+  definition: FlowDefinition,
+  roots: ExpressionRoots,
+): { nodes: FlowNode[]; branches: FlowPreviewBranch[] } {
   const index = new Map(definition.nodes.map((node) => [node.id, node]));
   const visited = new Set<string>();
   const nodes: FlowNode[] = [];
+  const branches: FlowPreviewBranch[] = [];
 
   const walk = (id: string | undefined): void => {
     const node = id === undefined ? undefined : index.get(id);
@@ -244,6 +254,7 @@ function pathNodes(definition: FlowDefinition, roots: ExpressionRoots): FlowNode
     if (node.type === "condition") {
       const branch = resolveBranch(node.branches, roots);
       if (branch !== null) {
+        branches.push({ conditionName: node.name, branchName: branch.name });
         for (const target of nextTargets(branch.next)) {
           walk(target);
         }
@@ -256,7 +267,7 @@ function pathNodes(definition: FlowDefinition, roots: ExpressionRoots): FlowNode
   };
 
   walk(definition.entry);
-  return nodes;
+  return { nodes, branches };
 }
 
 async function buildPreview(
@@ -274,6 +285,7 @@ async function buildPreview(
   const blocking: string[] = [];
   const warnings: string[] = [];
   const nodes: FlowPreviewNode[] = [];
+  const path = pathNodes(flow.definition, context);
 
   for (const issue of validateFlowDefinition(flow.definition)) {
     if (issue.level === "error") {
@@ -283,7 +295,7 @@ async function buildPreview(
     }
   }
 
-  for (const node of pathNodes(flow.definition, context)) {
+  for (const node of path.nodes) {
     if (node.type !== "approval" && node.type !== "cc") {
       continue;
     }
@@ -346,6 +358,7 @@ async function buildPreview(
     flowCode: flow.flowCode,
     version: flow.version,
     nodes,
+    branches: path.branches,
     blocking: [...new Set(blocking)],
     warnings: [...new Set(warnings)],
   };

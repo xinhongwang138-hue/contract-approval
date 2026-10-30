@@ -101,6 +101,7 @@ describe("contract submission", () => {
 
     const { preview, contract } = await previewContractFlow(access, contractId);
     expect(preview.blocking).toEqual([]);
+    expect(preview.branches).toEqual([]);
     expect(preview.nodes).toHaveLength(1);
     expect(preview.nodes[0]?.assigneeIds.sort()).toEqual(
       world.approverIds.slice(0, 2).sort(),
@@ -230,11 +231,17 @@ describe("contract submission", () => {
     const smallContractId = await world.createContract({ amount: "180000.00" });
     const { preview: smallPreview } = await previewContractFlow(access, smallContractId);
     expect(smallPreview.blocking).toEqual([]);
+    expect(smallPreview.branches).toEqual([
+      { conditionName: "金额分流", branchName: "50 万以下" },
+    ]);
     expect(smallPreview.nodes.map((node) => node.name)).toEqual(["部门主管审批"]);
 
     const bigContractId = await world.createContract({ amount: "680000.00" });
     const { preview: bigPreview } = await previewContractFlow(access, bigContractId);
     expect(bigPreview.blocking).toEqual([]);
+    expect(bigPreview.branches).toEqual([
+      { conditionName: "金额分流", branchName: "50 万以上" },
+    ]);
     expect(bigPreview.nodes.map((node) => node.name)).toEqual([
       "法务审核",
       "总经理审批",
@@ -313,6 +320,9 @@ describe("contract submission", () => {
     const bigContractId = await world.createContract({ amount: "680000.00" });
     const { preview } = await previewContractFlow(access, bigContractId);
     expect(preview.blocking).toEqual([]);
+    expect(preview.branches).toEqual([
+      { conditionName: "金额分流", branchName: "50 万以上并行会签" },
+    ]);
     expect(preview.nodes.map((node) => node.name)).toEqual(["法务审核", "财务审核"]);
 
     const smallContractId = await world.createContract({ amount: "180000.00" });

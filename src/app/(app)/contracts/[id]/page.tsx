@@ -337,20 +337,30 @@ export default async function ContractDetailPage({
           <section className="rounded-lg border bg-card p-4 shadow-xs">
             <h2 className="mb-3 text-sm font-semibold">审批与用印</h2>
             {preview ? (
-              <ol className="space-y-2 text-sm">
-                {preview.nodes.map((node, index) => (
-                  <li key={node.nodeId} className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{index + 1}</span>
-                    <span className="font-medium">{node.name}</span>
-                    <Badge variant="outline">{node.summary}</Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {node.assigneeNames.length > 0
-                        ? node.assigneeNames.join("、")
-                        : "解析不到人员"}
-                    </span>
+              <div className="space-y-2">
+                {preview.branches.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    命中分支：
+                    {preview.branches
+                      .map((branch) => `${branch.conditionName} → ${branch.branchName}`)
+                      .join("；")}
+                  </p>
+                ) : null}
+                <ol className="space-y-2 text-sm">
+                  {preview.nodes.map((node, index) => (
+                    <li key={node.nodeId} className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{index + 1}</span>
+                      <span className="font-medium">{node.name}</span>
+                      <Badge variant="outline">{node.summary}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {node.assigneeNames.length > 0
+                          ? node.assigneeNames.join("、")
+                          : "解析不到人员"}
+                      </span>
                   </li>
                 ))}
-              </ol>
+                </ol>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {previewError ?? "提交后按模板关联的审批流生成待办与轨迹。"}
