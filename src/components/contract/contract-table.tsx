@@ -30,17 +30,19 @@ function SortHeader({
   sort,
   order,
   href,
+  className,
 }: {
   field: ContractSortField;
   label: string;
   sort: ContractSortField;
   order: "asc" | "desc";
   href: string;
+  className?: string;
 }) {
   const active = sort === field;
   const Icon = active ? (order === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
-    <TableHead>
+    <TableHead className={className}>
       <Link
         href={href}
         className="inline-flex items-center gap-1 hover:text-foreground"
@@ -64,23 +66,25 @@ export function ContractTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>合同编号</TableHead>
+            <TableHead className="hidden sm:table-cell">合同编号</TableHead>
             <TableHead>标题</TableHead>
-            <TableHead>相对方</TableHead>
+            <TableHead className="hidden lg:table-cell">相对方</TableHead>
             <SortHeader
               field="amount"
               label="金额"
               sort={sort}
               order={order}
               href={sortHref("amount")}
+              className="hidden md:table-cell"
             />
-            <TableHead>状态</TableHead>
+            <TableHead className="hidden md:table-cell">状态</TableHead>
             <SortHeader
               field="endDate"
               label="到期日"
               sort={sort}
               order={order}
               href={sortHref("endDate")}
+              className="hidden md:table-cell"
             />
             <SortHeader
               field="updatedAt"
@@ -88,8 +92,11 @@ export function ContractTable({
               sort={sort}
               order={order}
               href={sortHref("updatedAt")}
+              className="hidden 2xl:table-cell"
             />
-            <TableHead className="text-right">操作</TableHead>
+            <TableHead className="sticky right-0 z-10 hidden border-l bg-card text-right md:table-cell">
+              操作
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -106,7 +113,9 @@ export function ContractTable({
           ) : (
             items.map((item) => (
               <TableRow key={item.id}>
-                <TableCell className="font-mono text-xs">{item.no}</TableCell>
+                <TableCell className="hidden font-mono text-xs break-all sm:table-cell">
+                  {item.no}
+                </TableCell>
                 <TableCell>
                   <Link
                     href={`/contracts/${item.id}`}
@@ -114,38 +123,53 @@ export function ContractTable({
                   >
                     {item.title}
                   </Link>
+                  {/* 状态列在窄屏隐藏，徽标改挂到标题下方独占一行，避免被挤裁 */}
+                  <span className="mt-1 block md:hidden">
+                    <ContractStatusBadge status={item.status} />
+                  </span>
                   <p className="text-xs text-muted-foreground">
                     {item.templateName} · {item.creatorName}
                   </p>
                 </TableCell>
-                <TableCell className="text-sm">
-                  {item.partyAName}
-                  <span className="mx-1 text-muted-foreground">→</span>
-                  {item.partyBName}
+                <TableCell className="hidden text-sm lg:table-cell">
+                  <p
+                    className="max-w-[18rem] truncate"
+                    title={`${item.partyAName} → ${item.partyBName}`}
+                  >
+                    {item.partyAName}
+                    <span className="mx-1 text-muted-foreground">→</span>
+                    {item.partyBName}
+                  </p>
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-sm">
+                <TableCell className="hidden whitespace-nowrap text-sm md:table-cell">
                   {formatMoney(item.amount, item.currency)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   <ContractStatusBadge status={item.status} />
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-sm">
+                <TableCell className="hidden whitespace-nowrap text-sm md:table-cell">
                   {formatDate(item.endDate)}
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground 2xl:table-cell">
                   {formatDate(item.updatedAt)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="sticky right-0 z-10 hidden border-l bg-card group-hover/tr:bg-muted/50 md:table-cell">
                   <div className="flex justify-end gap-1">
+                    {/* 窄屏只留图标：文字标签会把这一列撑到盖住标题，编辑入口在详情页仍有 */}
                     <Button asChild variant="ghost" size="sm">
-                      <Link href={`/contracts/${item.id}`}>
+                      <Link href={`/contracts/${item.id}`} aria-label="查看合同">
                         <Eye className="size-4" />
-                        查看
+                        <span className="hidden md:inline">查看</span>
                       </Link>
                     </Button>
                     {canEdit && isEditableContractStatus(item.status) ? (
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/contracts/${item.id}/edit`}>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="hidden md:inline-flex"
+                      >
+                        <Link href={`/contracts/${item.id}/edit`} aria-label="编辑合同">
                           <Pencil className="size-4" />
                           编辑
                         </Link>

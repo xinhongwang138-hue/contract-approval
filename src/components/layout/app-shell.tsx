@@ -168,8 +168,9 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
   const groups = visibleGroups(permissions);
 
+  // 1fr 的默认 min-width 是 auto，宽表会把整列顶出视口；minmax(0,1fr) 才让表格自己横向滚
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="hidden border-r bg-sidebar lg:block">
         <BrandHeader />
         <NavLinks pathname={pathname} groups={groups} />
