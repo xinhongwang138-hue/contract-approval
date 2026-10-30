@@ -2,6 +2,8 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getAccessContext } from "@/server/auth/access";
 import { prisma } from "@/server/db/client";
 import { requireEditableContract } from "@/server/services/contract";
+import { uploadAttachment } from "@/server/services/attachment";
+import { submitContract } from "@/server/services/approval";
 import {
   archiveContract,
   getContractLifecycle,
@@ -107,6 +109,34 @@ describe("seal lifecycle", () => {
     ).toBe(1);
   });
 
+  it("never moves a contract that has already passed to_seal", async () => {
+    // 状态守卫：合同已在履行中，再补一次取件不能把它退回 sealed
+    const access = await getAccessContext(world.bossId);
+    const contractId = await world.createContract();
+    await prisma.contract.update({ where: { id: contractId }, data: { status: "active" } });
+    const seal = await prisma.sealRecord.create({
+      data: {
+        contractId,
+        sealType: "company",
+        copies: 1,
+        applicantId: world.initiatorId,
+        appliedAt: new Date("2026-10-20T02:00:00.000Z"),
+      },
+      select: { id: true },
+    });
+
+    await pickSealRecord(access, seal.id);
+
+    const after = await prisma.contract.findUniqueOrThrow({
+      where: { id: contractId },
+      select: { status: true },
+    });
+    expect(after.status).toBe("active");
+    expect(
+      await prisma.contractMilestone.count({ where: { contractId, kind: "sealed" } }),
+    ).toBe(0);
+  });
+
   it("requires a pick before a return", async () => {
     const access = await getAccessContext(world.bossId);
     const { sealId } = await seedSeal("to_seal");
@@ -183,14 +213,25 @@ describe("archive", () => {
       await prisma.auditLog.count({ where: { entityId: contractId, action: "contract.archive" } }),
     ).toBe(1);
 
-    // 归档后只读：编辑、补附件、再提交都走同一个守卫
+    // 归档后只读：编辑、补附件、再提交三条写路径都要被服务端拒掉，而不是只藏按钮
     await expect(requireEditableContract(access, contractId)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    await expect(
+      uploadAttachment(access, {
+        contractId,
+        kind: "appendix",
+        file: new File([Buffer.from("%PDF-1.4")], "补充件.pdf", { type: "application/pdf" }),
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(submitContract(access, contractId)).rejects.toMatchObject({
       code: "CONFLICT",
     });
     await expect(archiveContract(access, contractId)).rejects.toMatchObject({
       code: "CONFLICT",
       message: "合同已归档",
     });
+    expect(await prisma.attachment.count({ where: { contractId } })).toBe(0);
   });
 
   it("refuses to archive a contract that has not reached the post-performance states", async () => {

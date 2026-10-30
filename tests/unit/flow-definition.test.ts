@@ -3,6 +3,7 @@ import {
   collectNodeTargets,
   conditionExprSchema,
   flowDefinitionSchema,
+  flowStateLabel,
   nextTargets,
   parseFlowDefinition,
 } from "@/shared/flow-definition";
@@ -191,5 +192,30 @@ describe("node target helpers", () => {
     const end = parsed.nodes.find((node) => node.type === "end");
     expect(end).toBeDefined();
     expect(collectNodeTargets(end!)).toEqual([]);
+  });
+});
+
+describe("audit state labels", () => {
+  it("resolves from/to by action prefix instead of the merged dictionary", () => {
+    // 三张字典有同名键且语义不同，合并后 spread 顺序会决定结果：
+    // running 在实例是「审批中」，在节点是「进行中」
+    expect(flowStateLabel("flow.started", "running")).toBe("审批中");
+    expect(flowStateLabel("node.started", "running")).toBe("进行中");
+    // approved 在实例/节点是「已通过」，在任务是「已同意」
+    expect(flowStateLabel("flow.finished", "approved")).toBe("已通过");
+    expect(flowStateLabel("node.approved", "approved")).toBe("已通过");
+    expect(flowStateLabel("task.approve", "approved")).toBe("已同意");
+    // pending 在节点是「等待进入」，在任务是「待处理」
+    expect(flowStateLabel("node.entered", "pending")).toBe("等待进入");
+    expect(flowStateLabel("task.approve", "pending")).toBe("待处理");
+  });
+
+  it("falls back for unknown prefixes and renders empty states as a dash", () => {
+    // 未知前缀只能落回合并字典：withdrawn 只有实例字典有
+    expect(flowStateLabel("seal.picked", "withdrawn")).toBe("已撤回");
+    expect(flowStateLabel("flow.started", null)).toBe("—");
+    expect(flowStateLabel("task.approve", "")).toBe("—");
+    // 完全不认识的取值原样返回，不吞掉信息
+    expect(flowStateLabel("flow.started", "brand_new_state")).toBe("brand_new_state");
   });
 });

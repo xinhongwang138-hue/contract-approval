@@ -280,6 +280,16 @@ test.describe("用印与归档", () => {
     await admin.getByRole("link", { name: /流程事件/ }).click();
     await expect(admin.getByRole("heading", { name: "审计日志" })).toBeVisible();
 
+    // 流程事件的 from → to 是实例状态，running 必须译成「审批中」；
+    // 若错用节点字典会变成「进行中」，而节点行 from/to 为空，所以「进行中」只可能来自这个 bug。
+    const changeCells = admin.getByRole("cell").filter({ hasText: "→" });
+    await expect(changeCells.filter({ hasText: /审批中/ }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(changeCells.filter({ hasText: /进行中/ })).toHaveCount(0);
+    // 原始英文状态不该露在变化列里
+    await expect(changeCells.filter({ hasText: /→\s*(running|approved|rejected)\b/ })).toHaveCount(0);
+
     // 报表里的流程汇总应能跳回过滤视图
     await admin.goto("/reports/efficiency?days=90");
     await expect(admin.getByText("流程汇总")).toBeVisible({ timeout: 30_000 });

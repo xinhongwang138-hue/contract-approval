@@ -51,12 +51,37 @@ export const TASK_STATUS_LABELS: Record<string, string> = {
   expired: "已超时",
 };
 
-// 审计里的 from → to 可能是实例 / 节点 / 任务三种状态之一，按此顺序合并取标签。
+// 审计里的 from → to 可能是实例 / 节点 / 任务三种状态之一。
+// 注意：三张字典存在同名键且语义不同 —— running（审批中 / 进行中）、
+// approved（已通过 / 已同意）、pending（等待进入 / 待处理）。
+// 合并成一张会按 spread 顺序互相覆盖，所以只能用它给「未知 action 前缀」兜底，
+// 真正的解析走下面的 flowStateLabel()。
 export const FLOW_STATE_LABELS: Record<string, string> = {
   ...FLOW_STATUS_LABELS,
   ...NODE_RUN_STATUS_LABELS,
   ...TASK_STATUS_LABELS,
 };
+
+/**
+ * 审计事件的状态标签。from / to 的语义由 action 前缀决定：
+ *   flow.* → 流程实例状态，node.* → 节点运行状态，task.* → 任务状态。
+ * 不按前缀区分会把 flow.started 的 running 渲染成「进行中」（应为「审批中」）。
+ */
+export function flowStateLabel(action: string, value: string | null): string {
+  if (value === null || value === "") {
+    return "—";
+  }
+  if (action.startsWith("task.")) {
+    return TASK_STATUS_LABELS[value] ?? FLOW_STATE_LABELS[value] ?? value;
+  }
+  if (action.startsWith("node.")) {
+    return NODE_RUN_STATUS_LABELS[value] ?? FLOW_STATE_LABELS[value] ?? value;
+  }
+  if (action.startsWith("flow.")) {
+    return FLOW_STATUS_LABELS[value] ?? FLOW_STATE_LABELS[value] ?? value;
+  }
+  return FLOW_STATE_LABELS[value] ?? value;
+}
 
 export const TASK_ACTION_LABELS: Record<string, string> = {
   approve: "同意",

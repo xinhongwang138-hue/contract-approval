@@ -22,7 +22,7 @@ export function ensureTestDatabase(): Promise<void> {
 }
 
 // 应用角色对 append-only 表只有 INSERT 权限，清空必须走 owner（迁移）角色。
-export async function deleteAsOwner(sql: string): Promise<void> {
+export async function deleteAsOwner(sql: string, params?: unknown[]): Promise<void> {
   const url = process.env.TEST_MIGRATE_DATABASE_URL;
   if (!url) {
     throw new Error("TEST_MIGRATE_DATABASE_URL 未配置，无法清理 append-only 表");
@@ -30,7 +30,7 @@ export async function deleteAsOwner(sql: string): Promise<void> {
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query(sql);
+    await client.query(sql, params as unknown[] | undefined);
   } finally {
     await client.end();
   }

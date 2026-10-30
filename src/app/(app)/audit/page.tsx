@@ -13,14 +13,7 @@ import {
   listFlowEvents,
 } from "@/server/services/audit-log";
 import { formatDateTime, parseShanghaiDate } from "@/shared/datetime";
-import { FLOW_STATE_LABELS } from "@/shared/flow-definition";
-
-function stateLabel(value: string | null): string {
-  if (value === null) {
-    return "—";
-  }
-  return FLOW_STATE_LABELS[value] ?? value;
-}
+import { flowStateLabel } from "@/shared/flow-definition";
 
 export const metadata = { title: "审计日志" };
 
@@ -115,7 +108,7 @@ export default async function AuditPage({
           action: row.action,
           objectLabel: `${row.contractNo} · ${row.contractTitle}`,
           objectHref: `/approvals/${row.instanceId}`,
-          change: `${stateLabel(row.from)} → ${stateLabel(row.to)}　${row.detail}`,
+          change: `${flowStateLabel(row.action, row.from)} → ${flowStateLabel(row.action, row.to)}　${row.detail}`,
           source: "",
           ua: "",
         }));
