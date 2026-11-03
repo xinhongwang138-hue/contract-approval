@@ -214,3 +214,11 @@ append-only 表由 `tests/helpers/db.ts` 用属主角色清理。
 - `erp.ts` — 外部系统同步
 
 均只有 `interface` + `TODO(interface only)` 注释，没有任何伪装成实现的代码。
+
+---
+
+## 10. 许可
+
+采用 [MIT 许可证](LICENSE)。可自由使用、修改、再分发（含商用），需保留原版权声明与许可声明；作者不提供任何担保。
+
+依赖组件各自遵循其上游许可证（Next.js、Prisma、better-auth、Tailwind CSS、shadcn/ui 等），本仓库许可证不覆盖第三方代码。
