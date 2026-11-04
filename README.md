@@ -38,7 +38,7 @@ npm run dev                   # http://127.0.0.1:3000
 npm run db:migrate   # prisma migrate dev
 npm run db:reset     # 丢库重放迁移；种子配在 prisma.config.ts 里，reset 不会自动跑
 npm run db:seed      # 主数据 + 演示数据（幂等，可反复跑）；reset 之后必须补这一条
-npm run test         # Vitest 单测 + 集成
+npm run test         # Vitest 单测；配了测试库则连同集成（见第 8 节）
 npm run test:e2e     # Playwright（自动起 :3100 dev server）
 npm run worker       # 审批超时 + 合同到期预警轮询
 ```
@@ -54,7 +54,7 @@ npm run worker       # 审批超时 + 合同到期预警轮询
 | --- | --- | --- |
 | `DATABASE_URL` | — | 应用角色 `contract_app`（只有 DML，无 DDL） |
 | `MIGRATE_DATABASE_URL` | — | 属主角色 `contract_owner`，仅迁移用 |
-| `TEST_DATABASE_URL` / `TEST_MIGRATE_DATABASE_URL` | — | 集成测试独立库 `contract_test` |
+| `TEST_DATABASE_URL` / `TEST_MIGRATE_DATABASE_URL` | — | 集成测试独立库 `contract_test`，两条都要填 |
 | `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL` | — | 会话签名密钥与站点地址 |
 | `STORAGE_DIR` | `./storage` | 附件落盘目录（运行时数据，不入库） |
 | `LOG_LEVEL` | `info` | pino 级别 |
@@ -187,12 +187,17 @@ sealed（登记取件）→ active（登记归还，合同生效）→ archived�
 ## 8. 测试
 
 ```bash
-npm run test        # Vitest：单测（纯函数/状态机/表达式/导出编码）+ 集成（真库 contract_test）
-npm run test:e2e    # Playwright：登录、管理端、起草、流程配置、审批全链路、用印归档、报表审计、导出下载
+npm run test             # Vitest：单测（纯函数/状态机/表达式/导出编码）+ 集成（配了测试库时）
+npm run test:integration # 只跑集成；TEST_MIGRATE_DATABASE_URL 缺失会直接报错退出，不静默跳过
+npm run test:e2e         # Playwright：登录、管理端、起草、流程配置、审批全链路、用印归档、报表审计、导出下载
 ```
 
 集成测试跑在独立的 `contract_test` 库上（每次 `migrate reset`），串行执行以免相互干扰；
 append-only 表由 `tests/helpers/db.ts` 用属主角色清理。
+
+**没配测试库时 `npm run test` 只跑单测**，并在控制台说明 `tests/integration` 被跳过——
+既不静默略过，也不把「环境没配」呈现成十几个失败文件。想确认集成测试真的跑了，用
+`npm run test:integration`：它缺变量就直接退出。
 
 已覆盖的关键验收点：
 会签 / 或签 / 比例通过语义、金额条件分支、定义快照不可变、加签与转签、

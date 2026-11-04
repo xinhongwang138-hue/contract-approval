@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "node scripts/assert-test-db.mjs && vitest run tests/integration",
     "test:e2e": "playwright test",
     "worker": "tsx scripts/worker.ts",
     "db:up": "docker compose up -d",
@@ -19,7 +20,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
-    "verify": "prisma migrate reset --force && npm run db:seed && npm run build && npm run test"
+    "verify": "prisma migrate reset --force && npm run db:seed && npm run build && node scripts/assert-test-db.mjs && npm test"
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.2",
